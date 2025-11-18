@@ -1,0 +1,76 @@
+﻿@page "/"
+
+<PageTitle>Inicio</PageTitle>
+
+<div class="container mt-4">
+    <h1 class="display-4">Sistema de Gestión de Incidentes DITIC</h1>
+    <p class="lead">Bienvenido al sistema de gestión de incidentes y base de conocimiento para servicios DITIC</p>
+
+    <div class="row mt-5">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5><i class="bi bi-exclamation-triangle-fill"></i> Gestión de Incidentes</h5>
+                </div>
+                <div class="card-body">
+                    <p>Registra, asigna y da seguimiento a los incidentes reportados por los estudiantes.</p>
+                    <ul>
+                        <li>Crear nuevos incidentes</li>
+                        <li>Asignar técnicos especializados</li>
+                        <li>Escalar entre niveles (Usuario Experto → Ingeniería → Proveedor)</li>
+                        <li>Seguimiento de estados y prioridades</li>
+                    </ul>
+                    <a href="/incidentes" class="btn btn-primary">Ir a Incidentes</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5><i class="bi bi-book-fill"></i> Base de Conocimiento</h5>
+                </div>
+                <div class="card-body">
+                    <p>Consulta y registra soluciones a problemas comunes para agilizar la resolución de incidentes.</p>
+                    <ul>
+                        <li>Buscar soluciones existentes</li>
+                        <li>Crear nuevos artículos</li>
+                        <li>Categorizar por tipo de problema</li>
+                        <li>Estadísticas de consultas</li>
+                    </ul>
+                    <a href="/conocimiento" class="btn btn-success">Ir a Base de Conocimiento</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5><i class="bi bi-info-circle-fill"></i> Niveles de Servicio DITIC</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <h6>Nivel 1: Usuario Experto</h6>
+                            <p class="small">Primer contacto para soporte básico</p>
+                        </div>
+                        <div class="col-md-3">
+                            <h6>Nivel 2: Ingeniería de Soporte</h6>
+                            <p class="small">Problemas técnicos especializados</p>
+                        </div>
+                        <div class="col-md-3">
+                            <h6>Nivel 3: Proveedor</h6>
+                            <p class="small">Escalamiento a fabricantes/proveedores</p>
+                        </div>
+                        <div class="col-md-3">
+                            <h6>Nivel 4: Proveedor Avanzado</h6>
+                            <p class="small">Casos críticos y complejos</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
