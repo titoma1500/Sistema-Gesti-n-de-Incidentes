@@ -22,6 +22,7 @@
   <ItemGroup>
     <Folder Include="src\Application\DTOs\Auth\" />
     <Folder Include="src\Application\DTOs\BaseConocimiento\" />
+    <Folder Include="src\Application\Services\" />
   </ItemGroup>
 
 </Project>
