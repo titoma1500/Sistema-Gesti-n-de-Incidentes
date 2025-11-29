@@ -1,0 +1,920 @@
+@page "/incidentes"
+@rendermode InteractiveServer
+@using Proyecto.Application.DTOs.Incidentes
+@using Proyecto.Application.DTOs.Auth
+@using Proyecto.Application.DTOs.BaseConocimiento
+@using Proyecto.Application.Interfaces
+@using Proyecto.Domain.Enums
+@inject IIncidenteService IncidenteService
+@inject IAuthService AuthService
+@inject IBaseConocimientoService BaseConocimientoService
+@inject ISessionService SessionService
+@inject NavigationManager Navigation
+
+<PageTitle>Gestión de Incidentes</PageTitle>
+
+@if (cargando)
+{
+    <p><em>Cargando...</em></p>
+}
+else
+{
+    <div class="container-fluid">
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <h3>@tituloSeccion</h3>
+            </div>
+            <div class="col-md-6 text-end">
+                @if (esEstudiante)
+                {
+                    <button class="btn btn-success" @onclick="NuevoIncidente">
+                        <span class="bi bi-plus-circle-fill"></span> Reportar Incidente
+                    </button>
+                }
+            </div>
+        </div>
+
+        @* Solo técnicos ven filtros *@
+        @if (esEstudiante == false)
+        {
+            <div class="row mb-3">
+                <div class="col-md-3">
+                    <select class="form-select" @onchange="FiltrarPorEstado">
+                        <option value="">Todos los estados</option>
+                        <option value="1">Abierto</option>
+                        <option value="2">Asignado</option>
+                        <option value="4">Resuelto</option>
+                        <option value="6">Escalado</option>
+                        <option value="7">Descartado</option>
+                    </select>
+                </div>
+            </div>
+        }
+
+    <!-- Lista de Incidentes -->
+    @if (incidentes == null)
+    {
+        <p><em>Cargando...</em></p>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Título</th>
+                        <th>Estado</th>
+                        <th>Prioridad</th>
+                        <th>Reportado por</th>
+                        <th>Asignado a</th>
+                        <th>Nivel</th>
+                        <th>Etiquetas</th>
+                        <th>Fecha</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var incidente in incidentes)
+                    {
+                        <tr>
+                            <td>@incidente.Id</td>
+                            <td>@incidente.Titulo</td>
+                            <td>
+                                <span class="badge bg-@ObtenerColorEstado(incidente.Estado)">
+                                    @incidente.Estado
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge bg-@ObtenerColorPrioridad(incidente.Prioridad)">
+                                    @incidente.Prioridad
+                                </span>
+                            </td>
+                            <td>@incidente.UsuarioReportaNombre</td>
+                            <td>
+                                @if (incidente.UsuarioAsignadoNombre != null)
+                                {
+                                    <div>@incidente.UsuarioAsignadoNombre</div>
+                                    @if (incidente.EspecialidadAsignado != null)
+                                    {
+                                        <small class="text-muted">@incidente.EspecialidadAsignado</small>
+                                    }
+                                }
+                                else
+                                {
+                                    <span class="text-muted">Por asignar</span>
+                                }
+                            </td>
+                            <td>
+                                @if (incidente.NivelAsignado != null)
+                                {
+                                    <span class="badge bg-info">Nivel @incidente.NivelAsignado</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary">-</span>
+                                }
+                            </td>
+                            <td>
+                                @foreach (var etiqueta in incidente.Etiquetas)
+                                {
+                                    <span class="badge bg-secondary me-1">
+                                        <i class="fas fa-tag me-1"></i>@etiqueta
+                                    </span>
+                                }
+                            </td>
+                            <td>@incidente.FechaCreacion.ToString("dd/MM/yyyy")</td>
+                            <td>
+                                <div class="d-flex flex-wrap gap-1">
+                                    <button class="btn btn-sm btn-primary" 
+                                            @onclick="() => VerDetalle(incidente.Id)">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    @if (esAdmin)
+                                    {
+                                        <button class="btn btn-sm btn-warning" 
+                                                @onclick="() => MostrarAsignar(incidente)">
+                                            <i class="fas fa-user-plus"></i>
+                                        </button>
+                                        @if (incidente.UsuarioAsignadoId == null)
+                                        {
+                                            <button class="btn btn-sm btn-success" 
+                                                    @onclick="() => MostrarResolver(incidente)">
+                                                <i class="fas fa-check"></i>
+                                            </button>
+                                        }
+                                        @if (incidente.Estado != "Resuelto" && incidente.Estado != "Descartado")
+                                        {
+                                            <button class="btn btn-sm btn-danger" 
+                                                    @onclick="() => MostrarDescartar(incidente)">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                        }
+                                    }
+                                    else if (!esEstudiante)
+                                    {
+                                        <!-- Botones para técnicos -->
+                                        @if (incidente.Estado != "Resuelto")
+                                        {
+                                            <button class="btn btn-sm btn-success" 
+                                                    @onclick="() => MostrarResolver(incidente)">
+                                                <i class="fas fa-check"></i>
+                                            </button>
+                                        }
+                                        @if (nivelUsuario < 4 && incidente.Estado != "Resuelto")
+                                        {
+                                            <button class="btn btn-sm btn-warning" 
+                                                    @onclick="() => MostrarEscalar(incidente)">
+                                                <i class="fas fa-arrow-up"></i>
+                                            </button>
+                                        }
+                                    }
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+}
+
+<!-- Modal Asignar -->
+@if (mostrarModalAsignar && incidenteSeleccionado != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Asignar Incidente #@incidenteSeleccionado.Id</h5>
+                    <button type="button" class="btn-close" @onclick="CerrarModales"></button>
+                </div>
+                <div class="modal-body">
+                    <!-- Información del Incidente -->
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h6 class="card-title">@incidenteSeleccionado.Titulo</h6>
+                            <p class="card-text">@incidenteSeleccionado.Descripcion</p>
+                            <div class="row">
+                                <div class="col-6">
+                                    <strong>Estado:</strong> <span class="badge bg-@ObtenerColorEstado(incidenteSeleccionado.Estado)">@incidenteSeleccionado.Estado</span>
+                                </div>
+                                <div class="col-6">
+                                    <strong>Prioridad:</strong> <span class="badge bg-@ObtenerColorPrioridad(incidenteSeleccionado.Prioridad)">@incidenteSeleccionado.Prioridad</span>
+                                </div>
+                            </div>
+                            <div class="mt-2">
+                                <strong>Etiquetas:</strong>
+                                @foreach (var etiqueta in incidenteSeleccionado.Etiquetas)
+                                {
+                                    <span class="badge bg-secondary me-1">@etiqueta</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <EditForm Model="asignarDto" OnValidSubmit="AsignarIncidente" FormName="asignarFormModal">
+                        <div class="mb-3">
+                            <label class="form-label">Seleccionar Nivel:</label>
+                            <select class="form-select" @onchange="CambiarNivelAsignacion">
+                                <option value="">-- Seleccionar Nivel --</option>
+                                <option value="1">Nivel 1 - Soporte Básico</option>
+                                <option value="2">Nivel 2 - Software y Aplicaciones</option>
+                                <option value="3">Nivel 3 - Redes y Servidores</option>
+                                <option value="4">Nivel 4 - Administración</option>
+                            </select>
+                        </div>
+
+                        @if (tecnicosDisponibles.Any())
+                        {
+                            <div class="mb-3">
+                                <label class="form-label">Técnico:</label>
+                                <InputSelect class="form-select" @bind-Value="asignarDto.UsuarioAsignadoId">
+                                    <option value="0">-- Seleccionar Técnico --</option>
+                                    @foreach (var tecnico in tecnicosDisponibles)
+                                    {
+                                        <option value="@tecnico.Id">@tecnico.Nombre - @tecnico.Especialidad</option>
+                                    }
+                                </InputSelect>
+                            </div>
+                        }
+
+                        @if (mensajeAsignar != null)
+                        {
+                            <div class="alert @(mensajeAsignarExito ? "alert-success" : "alert-danger")">
+                                @mensajeAsignar
+                            </div>
+                        }
+                    </EditForm>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CerrarModales">Cancelar</button>
+                    <button type="button" class="btn btn-primary" @onclick="AsignarIncidente">Asignar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Modal Resolver -->
+@if (mostrarModalResolver && incidenteSeleccionado != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Resolver Incidente #@incidenteSeleccionado.Id</h5>
+                    <button type="button" class="btn-close" @onclick="CerrarModales"></button>
+                </div>
+                <div class="modal-body">
+                    <!-- Información del Incidente -->
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h6 class="card-title">@incidenteSeleccionado.Titulo</h6>
+                            <p class="card-text">@incidenteSeleccionado.Descripcion</p>
+                            <div class="row">
+                                <div class="col-6">
+                                    <strong>Estado:</strong> <span class="badge bg-@ObtenerColorEstado(incidenteSeleccionado.Estado)">@incidenteSeleccionado.Estado</span>
+                                </div>
+                                <div class="col-6">
+                                    <strong>Prioridad:</strong> <span class="badge bg-@ObtenerColorPrioridad(incidenteSeleccionado.Prioridad)">@incidenteSeleccionado.Prioridad</span>
+                                </div>
+                            </div>
+                            <div class="mt-2">
+                                <strong>Reportado por:</strong> @incidenteSeleccionado.UsuarioReportaNombre
+                            </div>
+                            <div class="mt-2">
+                                <strong>Etiquetas:</strong>
+                                @foreach (var etiqueta in incidenteSeleccionado.Etiquetas)
+                                {
+                                    <span class="badge bg-secondary me-1">@etiqueta</span>
+                                }
+                            </div>
+                            @if (!string.IsNullOrEmpty(incidenteSeleccionado.MensajeEscalacion))
+                            {
+                                <div class="mt-3 alert alert-warning mb-0">
+                                    <h6><i class="bi bi-arrow-up-circle"></i> Mensaje de Escalamiento:</h6>
+                                    <p class="mb-0">@incidenteSeleccionado.MensajeEscalacion</p>
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    <!-- Soluciones Sugeridas -->
+                    @if (solucionesSugeridas.Any())
+                    {
+                        <div class="card mb-3 border-info">
+                            <div class="card-header bg-info text-white">
+                                <h6 class="mb-0"><i class="bi bi-lightbulb"></i> Soluciones Sugeridas de la Base de Conocimiento</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="list-group">
+                                    @foreach (var solucion in solucionesSugeridas)
+                                    {
+                                        <a href="javascript:void(0)" class="list-group-item list-group-item-action" @onclick="() => MostrarSolucion(solucion)">
+                                            <div class="d-flex w-100 justify-content-between">
+                                                <h6 class="mb-1">@solucion.Titulo</h6>
+                                                <small class="text-muted">@solucion.VecesConsultada visitas</small>
+                                            </div>
+                                            <p class="mb-1 text-muted small">@solucion.Descripcion</p>
+                                            <div>
+                                                @foreach (var etiqueta in solucion.Etiquetas)
+                                                {
+                                                    <span class="badge bg-secondary me-1">@etiqueta</span>
+                                                }
+                                            </div>
+                                        </a>
+                                    }
+                                </div>
+                                <div class="mt-2">
+                                    <a href="/conocimiento" class="btn btn-sm btn-outline-info">
+                                        Ver toda la Base de Conocimiento
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    }
+
+                    @if (solucionSeleccionada != null)
+                    {
+                        <div class="card mb-3 border-success">
+                            <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                                <h6 class="mb-0">@solucionSeleccionada.Titulo</h6>
+                                <button type="button" class="btn-close btn-close-white" @onclick="CerrarSolucion"></button>
+                            </div>
+                            <div class="card-body">
+                                <p><strong>Descripción:</strong> @solucionSeleccionada.Descripcion</p>
+                                <hr />
+                                <p><strong>Solución:</strong></p>
+                                <div class="bg-light p-3 rounded">
+                                    @((MarkupString)solucionSeleccionada.Solucion.Replace("\n", "<br>"))
+                                </div>
+                            </div>
+                        </div>
+                    }
+
+                    <EditForm Model="resolverDto" OnValidSubmit="ResolverIncidente" FormName="resolverFormModal">
+                        <div class="mb-3">
+                            <label class="form-label">Resolución:</label>
+                            <InputTextArea class="form-control" rows="4" @bind-Value="resolverDto.Resolucion" placeholder="Describe cómo se resolvió el incidente..." required />
+                        </div>
+
+                        @if (mensajeResolver != null)
+                        {
+                            <div class="alert @(mensajeResolverExito ? "alert-success" : "alert-danger")">
+                                @mensajeResolver
+                            </div>
+                        }
+                    </EditForm>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CerrarModales">Cancelar</button>
+                    <button type="button" class="btn btn-success" @onclick="ResolverIncidente">Marcar como Resuelto</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Modal Escalar -->
+@if (mostrarModalEscalar && incidenteSeleccionado != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Escalar Incidente #@incidenteSeleccionado.Id</h5>
+                    <button type="button" class="btn-close" @onclick="CerrarModales"></button>
+                </div>
+                <div class="modal-body">
+                    <!-- Información del Incidente -->
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h6 class="card-title">@incidenteSeleccionado.Titulo</h6>
+                            <p class="card-text">@incidenteSeleccionado.Descripcion</p>
+                            <div class="row">
+                                <div class="col-6">
+                                    <strong>Estado:</strong> <span class="badge bg-@ObtenerColorEstado(incidenteSeleccionado.Estado)">@incidenteSeleccionado.Estado</span>
+                                </div>
+                                <div class="col-6">
+                                    <strong>Prioridad:</strong> <span class="badge bg-@ObtenerColorPrioridad(incidenteSeleccionado.Prioridad)">@incidenteSeleccionado.Prioridad</span>
+                                </div>
+                            </div>
+                            @if (!string.IsNullOrEmpty(incidenteSeleccionado.MensajeEscalacion))
+                            {
+                                <div class="mt-3 alert alert-warning mb-0">
+                                    <h6><i class="bi bi-arrow-up-circle"></i> Escalamiento Previo:</h6>
+                                    <p class="mb-0">@incidenteSeleccionado.MensajeEscalacion</p>
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> Puedes escalar este incidente a un nivel superior (hasta Nivel 4)
+                    </div>
+
+                    <EditForm Model="escalarDto" FormName="escalarFormModal">
+                        <div class="mb-3">
+                            <label class="form-label">Seleccionar Nivel de Escalamiento:</label>
+                            <InputSelect class="form-select" @bind-Value="escalarDto.NuevoNivel" @bind-Value:after="OnNivelEscalamientoChanged">
+                                <option value="0">-- Seleccionar nivel --</option>
+                                @for (int i = nivelUsuario + 1; i <= 4; i++)
+                                {
+                                    <option value="@i">Nivel @i</option>
+                                }
+                            </InputSelect>
+                        </div>
+
+                        @if (escalarDto.NuevoNivel > 0 && tecnicosNivelSuperior.Any())
+                        {
+                            <div class="mb-3">
+                                <label class="form-label">Seleccionar Técnico de Nivel @escalarDto.NuevoNivel:</label>
+                                <InputSelect class="form-select" @bind-Value="escalarDto.UsuarioAsignadoId">
+                                    <option value="0">-- Seleccionar técnico --</option>
+                                    @foreach (var tecnico in tecnicosNivelSuperior)
+                                    {
+                                        <option value="@tecnico.Id">@tecnico.Nombre - @tecnico.Especialidad</option>
+                                    }
+                                </InputSelect>
+                            </div>
+                        }
+
+                        <div class="mb-3">
+                            <label class="form-label">Mensaje de Escalamiento <span class="text-danger">*</span></label>
+                            <small class="form-text text-muted d-block mb-2">
+                                Describe la razón del escalamiento y las acciones ya tomadas
+                            </small>
+                            <InputTextArea class="form-control" rows="5" @bind-Value="escalarDto.MensajeEscalacion" 
+                                         placeholder="Ejemplo: Se intentó reiniciar el servicio pero el problema persiste. Se requiere acceso de nivel superior para revisar configuraciones del servidor..." 
+                                         required />
+                        </div>
+
+                        @if (mensajeEscalar != null)
+                        {
+                            <div class="alert @(mensajeEscalarExito ? "alert-success" : "alert-danger")">
+                                @mensajeEscalar
+                            </div>
+                        }
+                    </EditForm>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CerrarModales">Cancelar</button>
+                    <button type="button" class="btn btn-warning" @onclick="EscalarIncidente">Escalar Incidente</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Modal Descartar -->
+@if (mostrarModalDescartar && incidenteSeleccionado != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title">Descartar Incidente #@incidenteSeleccionado.Id</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="CerrarModales"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle"></i> <strong>Atención:</strong> Esta acción descartará el incidente y notificará al usuario.
+                    </div>
+
+                    <div class="mb-3">
+                        <p><strong>Incidente:</strong> @incidenteSeleccionado.Titulo</p>
+                        <p><strong>Reportado por:</strong> @incidenteSeleccionado.UsuarioReportaNombre</p>
+                    </div>
+
+                    <EditForm Model="descartarDto" FormName="descartarFormModal">
+                        <div class="mb-3">
+                            <label class="form-label">Motivo del Descarte <span class="text-danger">*</span></label>
+                            <small class="form-text text-muted d-block mb-2">
+                                Ejemplo: "Problema ya resuelto", "Duplicado de incidente #123", etc.
+                            </small>
+                            <InputTextArea class="form-control" rows="4" @bind-Value="descartarDto.MotivoDescarte" 
+                                         placeholder="Ingresa el motivo por el cual se descarta este incidente..." 
+                                         required />
+                        </div>
+
+                        @if (mensajeDescartar != null)
+                        {
+                            <div class="alert @(mensajeDescartarExito ? "alert-success" : "alert-danger")">
+                                @mensajeDescartar
+                            </div>
+                        }
+                    </EditForm>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CerrarModales">Cancelar</button>
+                    <button type="button" class="btn btn-danger" @onclick="DescartarIncidente">Descartar Incidente</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<IncidenteDto>? incidentes;
+    private bool cargando = true;
+    private bool esEstudiante = false;
+    private bool esAdmin = false;
+    private int usuarioId = 0;
+    private int nivelUsuario = 0;
+    private string tituloSeccion = "Incidentes";
+    
+    // Modal Asignar
+    private bool mostrarModalAsignar = false;
+    private IncidenteDto? incidenteSeleccionado;
+    private List<UsuarioResponseDto> tecnicosDisponibles = new();
+    private string? mensajeAsignar;
+    private bool mensajeAsignarExito;
+    
+    [SupplyParameterFromForm]
+    private AsignarIncidenteDto asignarDto { get; set; } = new();
+    
+    // Modal Resolver
+    private bool mostrarModalResolver = false;
+    private string? mensajeResolver;
+    private bool mensajeResolverExito;
+    private List<BaseConocimientoDto> solucionesSugeridas = new();
+    private BaseConocimientoDto? solucionSeleccionada;
+    
+    [SupplyParameterFromForm]
+    private ResolverIncidenteDto resolverDto { get; set; } = new();
+    
+    // Modal Escalar
+    private bool mostrarModalEscalar = false;
+    private List<UsuarioResponseDto> tecnicosNivelSuperior = new();
+    private string? mensajeEscalar;
+    private bool mensajeEscalarExito;
+    
+    [SupplyParameterFromForm]
+    private EscalarIncidenteDto escalarDto { get; set; } = new();
+    
+    // Modal Descartar
+    private bool mostrarModalDescartar = false;
+    private string? mensajeDescartar;
+    private bool mensajeDescartarExito;
+    
+    [SupplyParameterFromForm]
+    private DescartarIncidenteDto descartarDto { get; set; } = new();
+    
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            Console.WriteLine("[Incidentes/Index] OnAfterRenderAsync - Iniciando");
+            var usuario = await SessionService.GetUsuarioActualAsync();
+            Console.WriteLine($"[Incidentes/Index] Usuario obtenido: {usuario?.Email ?? "null"}");
+            
+            if (usuario == null)
+            {
+                Console.WriteLine("[Incidentes/Index] No hay usuario, redirigiendo a login");
+                Navigation.NavigateTo("/login");
+                return;
+            }
+            
+            usuarioId = usuario.Id;
+            nivelUsuario = usuario.Nivel;
+            esEstudiante = usuario.Nivel == 0;
+            esAdmin = usuario.Nivel == 5;
+            tituloSeccion = esEstudiante ? "Mis Incidentes" : (esAdmin ? "Gestión de Incidentes" : "Mis Incidentes Asignados");
+            
+            Console.WriteLine($"[Incidentes/Index] Nivel: {usuario.Nivel}, Es estudiante: {esEstudiante}, Es admin: {esAdmin}, Nivel usuario: {nivelUsuario}");
+            cargando = false;
+            
+            await CargarIncidentes();
+            StateHasChanged();
+        }
+    }
+
+    private async Task CargarIncidentes()
+    {
+        if (esEstudiante)
+        {
+            // Estudiantes solo ven sus propios incidentes reportados
+            var resultado = await IncidenteService.ObtenerPorUsuarioAsync(usuarioId);
+            incidentes = resultado.ToList();
+        }
+        else if (esAdmin)
+        {
+            // Admin ve todos los incidentes
+            var resultado = await IncidenteService.ObtenerTodosAsync();
+            incidentes = resultado.ToList();
+        }
+        else
+        {
+            // Técnicos solo ven incidentes asignados a ellos
+            var resultado = await IncidenteService.ObtenerPorAsignadoAsync(usuarioId);
+            incidentes = resultado.ToList();
+        }
+    }
+
+    private void NuevoIncidente()
+    {
+        Navigation.NavigateTo("/incidentes/crear");
+    }
+
+    private void VerDetalle(int id)
+    {
+        Navigation.NavigateTo($"/incidentes/detalle/{id}");
+    }
+
+    private async Task FiltrarPorEstado(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int estadoId))
+        {
+            if (esEstudiante)
+            {
+                // Estudiantes: filtrar sus incidentes por estado
+                var todosLosIncidentes = await IncidenteService.ObtenerPorUsuarioAsync(usuarioId);
+                incidentes = todosLosIncidentes.Where(i => MapearEstadoAInt(i.Estado) == estadoId).ToList();
+            }
+            else if (esAdmin)
+            {
+                // Admin: filtrar todos los incidentes por estado
+                var resultado = await IncidenteService.ObtenerPorEstadoAsync(estadoId);
+                incidentes = resultado.ToList();
+            }
+            else
+            {
+                // Técnicos: filtrar sus incidentes asignados por estado
+                var todosLosIncidentes = await IncidenteService.ObtenerPorAsignadoAsync(usuarioId);
+                incidentes = todosLosIncidentes.Where(i => MapearEstadoAInt(i.Estado) == estadoId).ToList();
+            }
+        }
+        else
+        {
+            await CargarIncidentes();
+        }
+    }
+
+    private int MapearEstadoAInt(string estado) => estado switch
+    {
+        "Abierto" => 1,
+        "Asignado" => 2,
+        "EnProceso" => 3,
+        "Resuelto" => 4,
+        "Cerrado" => 5,
+        "Escalado" => 6,
+        "Descartado" => 7,
+        _ => 0
+    };
+
+    private string ObtenerColorEstado(string estado) => estado switch
+    {
+        "Abierto" => "primary",
+        "Asignado" => "info",
+        "Resuelto" => "success",
+        "Escalado" => "warning",
+        "Descartado" => "dark",
+        _ => "secondary"
+    };
+
+    private string ObtenerColorPrioridad(string prioridad) => prioridad switch
+    {
+        "Baja" => "secondary",
+        "Media" => "info",
+        "Alta" => "warning",
+        "Critica" => "danger",
+        _ => "secondary"
+    };
+    
+    private void MostrarAsignar(IncidenteDto incidente)
+    {
+        incidenteSeleccionado = incidente;
+        asignarDto = new AsignarIncidenteDto { IncidenteId = incidente.Id };
+        tecnicosDisponibles.Clear();
+        mensajeAsignar = null;
+        mostrarModalAsignar = true;
+    }
+    
+    private async Task CambiarNivelAsignacion(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int nivel))
+        {
+            tecnicosDisponibles = await AuthService.ObtenerUsuariosPorNivelAsync(nivel);
+            StateHasChanged();
+        }
+        else
+        {
+            tecnicosDisponibles.Clear();
+        }
+    }
+    
+    private async Task AsignarIncidente()
+    {
+        try
+        {
+            if (asignarDto.UsuarioAsignadoId <= 0)
+            {
+                mensajeAsignar = "Debe seleccionar un técnico";
+                mensajeAsignarExito = false;
+                return;
+            }
+            
+            await IncidenteService.AsignarAsync(asignarDto);
+            mensajeAsignar = "✓ Incidente asignado correctamente";
+            mensajeAsignarExito = true;
+            
+            await Task.Delay(1500);
+            CerrarModales();
+            await CargarIncidentes();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            mensajeAsignar = $"Error al asignar: {ex.Message}";
+            mensajeAsignarExito = false;
+        }
+    }
+    
+    private async Task MostrarResolver(IncidenteDto incidente)
+    {
+        incidenteSeleccionado = incidente;
+        resolverDto = new ResolverIncidenteDto { IncidenteId = incidente.Id };
+        mensajeResolver = null;
+        solucionSeleccionada = null;
+        
+        // Cargar soluciones sugeridas basadas en etiquetas del incidente
+        if (incidente.Etiquetas != null && incidente.Etiquetas.Any())
+        {
+            var soluciones = await BaseConocimientoService.ObtenerPorEtiquetasAsync(incidente.Etiquetas);
+            solucionesSugeridas = soluciones.ToList();
+        }
+        else
+        {
+            solucionesSugeridas.Clear();
+        }
+        
+        mostrarModalResolver = true;
+    }
+    
+    private async Task ResolverIncidente()
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(resolverDto.Resolucion))
+            {
+                mensajeResolver = "Debe proporcionar una resolución";
+                mensajeResolverExito = false;
+                return;
+            }
+            
+            await IncidenteService.ResolverAsync(resolverDto);
+            mensajeResolver = "✓ Incidente marcado como resuelto";
+            mensajeResolverExito = true;
+            
+            await Task.Delay(1500);
+            CerrarModales();
+            await CargarIncidentes();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            mensajeResolver = $"Error al resolver: {ex.Message}";
+            mensajeResolverExito = false;
+        }
+    }
+    
+    private async Task MostrarSolucion(BaseConocimientoDto solucion)
+    {
+        solucionSeleccionada = solucion;
+        await BaseConocimientoService.IncrementarConsultasAsync(solucion.Id);
+        StateHasChanged();
+    }
+    
+    private void CerrarSolucion()
+    {
+        solucionSeleccionada = null;
+    }
+    
+    private void MostrarEscalar(IncidenteDto incidente)
+    {
+        incidenteSeleccionado = incidente;
+        escalarDto = new EscalarIncidenteDto 
+        { 
+            IncidenteId = incidente.Id,
+            NuevoNivel = 0  // Iniciar en 0 para que el usuario seleccione
+        };
+        mensajeEscalar = null;
+        tecnicosNivelSuperior.Clear();
+        
+        mostrarModalEscalar = true;
+    }
+    
+    private async Task OnNivelEscalamientoChanged()
+    {
+        // Cargar técnicos del nivel seleccionado
+        if (escalarDto.NuevoNivel > 0)
+        {
+            var todosLosTecnicos = await AuthService.ObtenerUsuariosPorNivelAsync(escalarDto.NuevoNivel);
+            tecnicosNivelSuperior = todosLosTecnicos.ToList();
+            
+            // Resetear selección de técnico
+            escalarDto.UsuarioAsignadoId = 0;
+        }
+        else
+        {
+            tecnicosNivelSuperior.Clear();
+            escalarDto.UsuarioAsignadoId = 0;
+        }
+    }
+    
+    private async Task EscalarIncidente()
+    {
+        try
+        {
+            if (escalarDto.NuevoNivel <= 0)
+            {
+                mensajeEscalar = "Debe seleccionar un nivel de escalamiento";
+                mensajeEscalarExito = false;
+                return;
+            }
+            
+            if (escalarDto.UsuarioAsignadoId <= 0)
+            {
+                mensajeEscalar = "Debe seleccionar un técnico del nivel superior";
+                mensajeEscalarExito = false;
+                return;
+            }
+            
+            if (string.IsNullOrWhiteSpace(escalarDto.MensajeEscalacion))
+            {
+                mensajeEscalar = "Debe proporcionar un mensaje explicando el escalamiento";
+                mensajeEscalarExito = false;
+                return;
+            }
+            
+            await IncidenteService.EscalarAsync(escalarDto);
+            mensajeEscalar = "✓ Incidente escalado correctamente al Nivel " + escalarDto.NuevoNivel;
+            mensajeEscalarExito = true;
+            
+            await Task.Delay(1500);
+            CerrarModales();
+            await CargarIncidentes();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            mensajeEscalar = $"Error al escalar: {ex.Message}";
+            mensajeEscalarExito = false;
+        }
+    }
+    
+    private void MostrarDescartar(IncidenteDto incidente)
+    {
+        incidenteSeleccionado = incidente;
+        descartarDto = new DescartarIncidenteDto { IncidenteId = incidente.Id };
+        mensajeDescartar = null;
+        
+        mostrarModalDescartar = true;
+    }
+    
+    private async Task DescartarIncidente()
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(descartarDto.MotivoDescarte))
+            {
+                mensajeDescartar = "Debe proporcionar el motivo del descarte";
+                mensajeDescartarExito = false;
+                return;
+            }
+            
+            await IncidenteService.DescartarAsync(descartarDto);
+            mensajeDescartar = "✓ Incidente descartado correctamente";
+            mensajeDescartarExito = true;
+            
+            await Task.Delay(1500);
+            CerrarModales();
+            await CargarIncidentes();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            mensajeDescartar = $"Error al descartar: {ex.Message}";
+            mensajeDescartarExito = false;
+        }
+    }
+    
+    private void CerrarModales()
+    {
+        mostrarModalAsignar = false;
+        mostrarModalResolver = false;
+        mostrarModalEscalar = false;
+        mostrarModalDescartar = false;
+        incidenteSeleccionado = null;
+        tecnicosDisponibles.Clear();
+        tecnicosNivelSuperior.Clear();
+        solucionesSugeridas.Clear();
+        solucionSeleccionada = null;
+        mensajeAsignar = null;
+        mensajeResolver = null;
+        mensajeEscalar = null;
+        mensajeDescartar = null;
+    }
+}

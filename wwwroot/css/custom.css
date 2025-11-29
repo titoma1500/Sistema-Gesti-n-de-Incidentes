@@ -1,0 +1,28 @@
+/* Estilos personalizados del sistema de incidentes */
+
+:root {
+    --color-primary: #0d6efd;
+    --color-success: #198754;
+    --color-warning: #ffc107;
+    --color-danger: #dc3545;
+}
+
+.incidente-card {
+    transition: transform 0.2s;
+    cursor: pointer;
+}
+
+.incidente-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.badge-etiqueta {
+    font-size: 0.85rem;
+    padding: 0.35rem 0.65rem;
+    margin: 0.2rem;
+}
+
+.table-hover tbody tr:hover {
+    background-color: rgba(0,0,0,0.05);
+}

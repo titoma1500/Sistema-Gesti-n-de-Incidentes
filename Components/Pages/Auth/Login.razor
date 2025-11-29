@@ -1,0 +1,119 @@
+@page "/"
+@page "/login"
+@rendermode InteractiveServer
+@using Proyecto.Application.DTOs.Auth
+@using Proyecto.Application.Interfaces
+@using Microsoft.JSInterop
+@inject IAuthService AuthService
+@inject ISessionService SessionService
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Login - Sistema de Gestión de Incidentes</PageTitle>
+
+<div class="container">
+    <div class="row justify-content-center mt-5">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header bg-primary text-white text-center">
+                    <span class="bi bi-tools" style="font-size: 2rem;"></span>
+                    <h4 class="mt-2">Sistema de Gestión de Incidentes</h4>
+                    <small>Iniciar Sesión</small>
+                </div>
+                <div class="card-body">
+                    <EditForm Model="loginDto" OnValidSubmit="HandleLogin" FormName="loginForm">
+                        <DataAnnotationsValidator />
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Email:</label>
+                            <InputText class="form-control" @bind-Value="loginDto.Email" 
+                                       placeholder="usuario@universidad.edu" />
+                            <ValidationMessage For="@(() => loginDto.Email)" />
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Contraseña:</label>
+                            <InputText type="password" class="form-control" 
+                                       @bind-Value="loginDto.Password" />
+                            <ValidationMessage For="@(() => loginDto.Password)" />
+                        </div>
+                        
+                        @if (!string.IsNullOrEmpty(errorMessage))
+                        {
+                            <div class="alert alert-danger">@errorMessage</div>
+                        }
+                        
+                        <button type="submit" class="btn btn-primary w-100">
+                            Ingresar
+                        </button>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromForm]
+    private LoginDto loginDto { get; set; } = new();
+    private string errorMessage = string.Empty;
+    private bool procesandoLogin = false;
+
+    private async Task HandleLogin()
+    {
+        if (procesandoLogin) return;
+        
+        procesandoLogin = true;
+        errorMessage = string.Empty;
+        StateHasChanged();
+        
+        try
+        {
+            Console.WriteLine($"[Login] Intentando login para: {loginDto.Email}");
+            var response = await AuthService.LoginAsync(loginDto);
+            
+            if (response != null)
+            {
+                Console.WriteLine($"[Login] Login exitoso: {response.Email}, Nivel: {response.Nivel}");
+                
+                // Guardar usuario en sesión
+                await SessionService.SetUsuarioActualAsync(response);
+                
+                Console.WriteLine("[Login] Usuario guardado en sesión");
+                
+                // Esperar a que se guarde en sessionStorage
+                await Task.Delay(200);
+                
+                // Todos los usuarios van a /incidentes
+                // Estudiantes verán solo sus incidentes, técnicos verán todos
+                var destino = "/incidentes";
+                Console.WriteLine($"[Login] Redirigiendo a {destino}");
+                
+                try
+                {
+                    await JSRuntime.InvokeVoidAsync("location.assign", destino);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[Login] Error en redirección JS: {ex.Message}");
+                    Navigation.NavigateTo(destino, forceLoad: true);
+                }
+            }
+            else
+            {
+                Console.WriteLine("[Login] Login falló: credenciales incorrectas");
+                errorMessage = "Credenciales incorrectas";
+                procesandoLogin = false;
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Login] Error en HandleLogin: {ex.Message}");
+            Console.WriteLine($"[Login] Stack: {ex.StackTrace}");
+            errorMessage = $"Error al iniciar sesión: {ex.Message}";
+            procesandoLogin = false;
+            StateHasChanged();
+        }
+    }
+}

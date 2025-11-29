@@ -1,0 +1,34 @@
+@using Proyecto.Application.DTOs.Incidentes
+
+<div class="card incidente-card">
+    <div class="card-header d-flex justify-content-between">
+        <strong>@Incidente.Titulo</strong>
+        <span class="badge bg-@ObtenerColorPrioridad()">@Incidente.Prioridad</span>
+    </div>
+    <div class="card-body">
+        <p>@Incidente.Descripcion</p>
+        <div class="d-flex justify-content-between align-items-center">
+            <small class="text-muted">@Incidente.FechaCreacion.ToString("dd/MM/yyyy")</small>
+            <button class="btn btn-sm btn-primary" @onclick="() => OnVerClick.InvokeAsync(Incidente.Id)">
+                Ver
+            </button>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public IncidenteDto Incidente { get; set; } = null!;
+    
+    [Parameter]
+    public EventCallback<int> OnVerClick { get; set; }
+
+    private string ObtenerColorPrioridad() => Incidente.Prioridad switch
+    {
+        "Baja" => "secondary",
+        "Media" => "info",
+        "Alta" => "warning",
+        "Critica" => "danger",
+        _ => "secondary"
+    };
+}

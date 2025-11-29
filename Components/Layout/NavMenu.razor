@@ -1,6 +1,15 @@
-﻿<div class="top-row ps-3 navbar navbar-dark">
+@rendermode InteractiveServer
+@using Proyecto.Application.Interfaces
+@using Proyecto.Application.DTOs.Auth
+@inject ISessionService SessionService
+@inject NavigationManager Navigation
+
+<div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
-        <a class="navbar-brand" href="">Sistema DITIC</a>
+        <a class="navbar-brand d-flex align-items-center" href="" style="font-size: 0.95rem;">
+            <i class="fas fa-tools me-2" style="font-size: 1.3rem; color: #ffc107;"></i>
+            <span>Gestión de Incidentes y BD</span>
+        </a>
     </div>
 </div>
 
@@ -8,23 +17,109 @@
 
 <div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
     <nav class="flex-column">
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Inicio
-            </NavLink>
-        </div>
+        @if (usuario != null)
+        {
+            @if (usuario.Nivel == 0)
+            {
+                <!-- Menú para Estudiantes -->
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="incidentes">
+                        <span class="bi bi-clipboard-check-fill" aria-hidden="true"></span> Mis Incidentes
+                    </NavLink>
+                </div>
+                
+                <!-- Información del Usuario -->
+                <div class="nav-item px-3 mt-auto">
+                    <div class="d-flex align-items-center bg-dark bg-opacity-50 px-3 py-2 rounded">
+                        <i class="fas fa-user-graduate me-2" style="font-size: 1.2rem; color: #17a2b8;"></i>
+                        <div class="d-flex flex-column">
+                            <span class="text-white fw-bold" style="font-size: 0.85rem;">@usuario.Nombre</span>
+                            <small class="text-white-50" style="font-size: 0.7rem;">Estudiante</small>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="nav-item px-3 mt-2">
+                    <button class="btn btn-outline-danger w-100" @onclick="CerrarSesion">
+                        <span class="bi bi-box-arrow-right" aria-hidden="true"></span> Cerrar Sesión
+                    </button>
+                </div>
+            }
+            else
+            {
+                <!-- Menú para Técnicos y Administradores -->
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="incidentes">
+                        <span class="bi bi-ticket-detailed-fill" aria-hidden="true"></span> Incidentes
+                    </NavLink>
+                </div>
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="incidentes">
-                <span class="bi bi-exclamation-triangle-fill" aria-hidden="true"></span> Incidentes
-            </NavLink>
-        </div>
-
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="conocimiento">
-                <span class="bi bi-book-fill" aria-hidden="true"></span> Base de Conocimiento
-            </NavLink>
-        </div>
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="conocimiento">
+                        <span class="bi bi-lightbulb-fill" aria-hidden="true"></span> Base de Conocimiento
+                    </NavLink>
+                </div>
+                
+                <!-- Información del Usuario -->
+                <div class="nav-item px-3 mt-auto">
+                    <div class="d-flex align-items-center bg-dark bg-opacity-50 px-3 py-2 rounded">
+                        @if (usuario.Nivel == 5)
+                        {
+                            <i class="fas fa-user-shield me-2" style="font-size: 1.2rem; color: #dc3545;"></i>
+                        }
+                        else
+                        {
+                            <i class="fas fa-user-cog me-2" style="font-size: 1.2rem; color: #28a745;"></i>
+                        }
+                        <div class="d-flex flex-column">
+                            <span class="text-white fw-bold" style="font-size: 0.85rem;">@usuario.Nombre</span>
+                            <small class="text-white-50" style="font-size: 0.7rem;">
+                                @(usuario.Nivel == 5 ? "Administrador" : $"Técnico Nivel {usuario.Nivel}")
+                            </small>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="nav-item px-3 mt-2">
+                    <button class="btn btn-outline-danger w-100" @onclick="CerrarSesion">
+                        <span class="bi bi-box-arrow-right" aria-hidden="true"></span> Cerrar Sesión
+                    </button>
+                </div>
+            }
+        }
+        else
+        {
+            <!-- Menú cuando no está autenticado -->
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="login">
+                    <span class="bi bi-box-arrow-in-right" aria-hidden="true"></span> Iniciar Sesión
+                </NavLink>
+            </div>
+        }
     </nav>
 </div>
 
+@code {
+    private UsuarioResponseDto? usuario;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            usuario = await SessionService.GetUsuarioActualAsync();
+            StateHasChanged();
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        usuario = await SessionService.GetUsuarioActualAsync();
+    }
+
+    private async Task CerrarSesion()
+    {
+        await SessionService.ClearUsuarioActualAsync();
+        usuario = null;
+        Navigation.NavigateTo("/login");
+    }
+}

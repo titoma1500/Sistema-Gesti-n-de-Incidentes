@@ -4,6 +4,7 @@ using Proyecto.Infrastructure.Data;
 using Proyecto.Application.Interfaces;
 using Proyecto.Application.Services;
 using Proyecto.Infrastructure.Repositories;
+using Microsoft.AspNetCore.Components.Server.Circuits;
 
 namespace Proyecto
 {
@@ -26,10 +27,21 @@ namespace Proyecto
             // Registrar repositorios
             builder.Services.AddScoped<IIncidenteRepository, IncidenteRepository>();
             builder.Services.AddScoped<IBaseConocimientoRepository, BaseConocimientoRepository>();
+            builder.Services.AddScoped<IUsuarioRepository, UsuarioRepository>();
 
-            // Registrar servicios
+            // Registrar servicios de infraestructura
+            builder.Services.AddScoped<Infrastructure.Services.IEmailService, Infrastructure.Services.EmailService>();
+
+            // Registrar servicios de aplicación
+            builder.Services.AddScoped<IAuthService, AuthService>();
+            builder.Services.AddScoped<ISessionService, SessionService>();
             builder.Services.AddScoped<IIncidenteService, IncidenteService>();
             builder.Services.AddScoped<IBaseConocimientoService, BaseConocimientoService>();
+            builder.Services.AddScoped<IEtiquetaService, EtiquetaService>();
+            builder.Services.AddScoped<Application.Interfaces.IEmailService, EmailServiceAdapter>();
+            
+            // Configurar circuit handler para mantener el estado
+            builder.Services.AddScoped<CircuitHandler, CircuitHandlerService>();
 
             var app = builder.Build();
 

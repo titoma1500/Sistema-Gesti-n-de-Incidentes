@@ -1,0 +1,137 @@
+@page "/conocimiento"
+@rendermode InteractiveServer
+@using Proyecto.Application.DTOs.BaseConocimiento
+@using Proyecto.Application.Interfaces
+@inject IBaseConocimientoService BaseConocimientoService
+@inject ISessionService SessionService
+@inject NavigationManager Navigation
+
+<PageTitle>Base de Conocimiento</PageTitle>
+
+@if (cargando)
+{
+    <p><em>Cargando...</em></p>
+}
+else if (!tieneAcceso)
+{
+    <div class="alert alert-danger">
+        <h4>Acceso Denegado</h4>
+        <p>No tienes permisos para acceder a la base de conocimiento. Esta sección es solo para técnicos y administradores.</p>
+        <button class="btn btn-primary" @onclick='() => Navigation.NavigateTo("/incidentes/crear")'>
+            Ir a Crear Incidente
+        </button>
+    </div>
+}
+else
+{
+    <div class="container">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h3>Base de Conocimiento</h3>
+            <button class="btn btn-success" @onclick="IrACrear">
+                <i class="bi bi-plus-circle"></i> Nueva Solución
+            </button>
+        </div>
+    
+    <div class="row mt-3">
+        <div class="col-md-8">
+            <input type="text" class="form-control" 
+                   placeholder="Buscar por palabras clave..."
+                   @bind="textoBusqueda"
+                   @bind:event="oninput" />
+        </div>
+        <div class="col-md-4">
+            <button class="btn btn-primary w-100" @onclick="RealizarBusqueda">
+                Buscar
+            </button>
+        </div>
+    </div>
+    
+    <!-- Resultados -->
+    @if (articulos != null)
+    {
+        <div class="row mt-4">
+            @foreach (var articulo in articulos)
+            {
+                <div class="col-md-6 mb-3">
+                    <div class="card h-100">
+                        <div class="card-header">
+                            <strong>@articulo.Titulo</strong>
+                        </div>
+                        <div class="card-body">
+                            <p>@articulo.Descripcion</p>
+                            <div class="mb-2">
+                                @foreach (var etiqueta in articulo.Etiquetas)
+                                {
+                                    <span class="badge bg-info me-1">@etiqueta</span>
+                                }
+                            </div>
+                            <small class="text-muted">
+                                Consultado @articulo.VecesConsultada veces
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    </div>
+}
+
+@code {
+    private List<BaseConocimientoDto>? articulos;
+    private string textoBusqueda = string.Empty;
+    private bool cargando = true;
+    private bool tieneAcceso = false;
+    private int nivelUsuario = 0;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            var usuario = await SessionService.GetUsuarioActualAsync();
+            
+            if (usuario == null)
+            {
+                Navigation.NavigateTo("/login");
+                return;
+            }
+            
+            nivelUsuario = usuario.Nivel;
+            tieneAcceso = usuario.Nivel >= 1;
+            cargando = false;
+            
+            if (tieneAcceso)
+            {
+                await BuscarArticulos();
+            }
+            
+            StateHasChanged();
+        }
+    }
+
+    private async Task RealizarBusqueda()
+    {
+        await BuscarArticulos();
+    }
+
+    private async Task BuscarArticulos()
+    {
+        var dto = new BuscarBaseConocimientoDto
+        {
+            TextoBusqueda = textoBusqueda
+        };
+        
+        var resultado = await BaseConocimientoService.BuscarAsync(dto);
+        articulos = resultado.ToList();
+    }
+
+    private void IrACrear()
+    {
+        Navigation.NavigateTo("/base-conocimiento/crear");
+    }
+
+    private void IrACrearIncidente()
+    {
+        Navigation.NavigateTo("/incidentes/crear");
+    }
+}

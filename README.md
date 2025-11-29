@@ -1,139 +1,222 @@
-# Sistema de Gestión de Incidentes DITIC
+# 🎫 Sistema de Gestión de Incidentes y Base de Conocimiento
 
-Sistema de gestión de incidentes y base de conocimiento para servicios DITIC universitarios, desarrollado con Blazor Server, .NET 8, Arquitectura Onion y SQL Server.
+Sistema completo de gestión de incidentes con base de conocimiento integrada, desarrollado con Blazor Server, .NET 8, Arquitectura Onion y SQL Server. Diseñado para instituciones educativas con soporte técnico multinivel.
 
-## Características
+## ✨ Características Principales
 
-### Gestión de Incidentes
-- Registro de incidentes reportados por estudiantes
-- Sistema de prioridades (Baja, Media, Alta, Crítica)
-- Estados del incidente (Nuevo, Asignado, En Proceso, Escalado, Resuelto, Cerrado)
-- Escalamiento entre 4 niveles de servicio
-- Asignación de técnicos especializados
-- Seguimiento de fechas (creación, asignación, resolución)
+### 📋 Gestión de Incidentes
+- **Reportes de usuarios**: Los estudiantes pueden crear y dar seguimiento a sus incidentes
+- **Sistema de prioridades**: Baja, Media, Alta y Crítica
+- **Flujo de estados**: Abierto → Asignado → Escalado → Resuelto/Descartado
+- **Asignación inteligente**: Asignación a técnicos según nivel y especialidad
+- **Escalamiento multinivel**: 4 niveles técnicos + administrador
+- **Sistema de etiquetas**: Clasificación y búsqueda por categorías
+- **Límite de incidentes activos**: Control de 3 incidentes máximo por estudiante
+- **Descarte de incidentes**: Cierre administrativo con justificación
 
-### Base de Conocimiento
-- Registro de soluciones a problemas comunes
-- Búsqueda por palabras clave
-- Categorización de artículos
-- Estadísticas de consultas
-- Sistema de palabras clave para búsqueda rápida
+### 💡 Base de Conocimiento
+- **Artículos de soluciones**: Documentación de problemas comunes y sus resoluciones
+- **Búsqueda inteligente**: Por título, descripción y etiquetas
+- **Sugerencias automáticas**: Soluciones relacionadas mostradas al resolver incidentes
+- **Gestión completa**: Crear, editar y eliminar artículos (solo técnicos/admin)
 
-### Niveles de Servicio DITIC
-1. **Usuario Experto** - Soporte básico de primer nivel
-2. **Ingeniería de Soporte** - Problemas técnicos especializados
-3. **Proveedor** - Escalamiento a fabricantes
-4. **Proveedor Avanzado** - Casos críticos y complejos
+### 👥 Sistema de Usuarios
+- **Estudiantes (Nivel 0)**: Crear y consultar sus incidentes
+- **Técnicos (Niveles 1-4)**: 
+  - Ver incidentes asignados
+  - Resolver problemas
+  - Escalar a nivel superior
+  - Gestionar base de conocimiento
+- **Administrador (Nivel 5)**:
+  - Asignar incidentes a técnicos
+  - Resolver directamente
+  - Descartar incidentes
+  - Acceso total a base de conocimiento
 
-## Arquitectura
+## 🏗️ Arquitectura
 
-El proyecto implementa **Arquitectura Onion** con las siguientes capas:
+Implementa **Arquitectura Onion** (Clean Architecture) garantizando separación de responsabilidades:
 
 ```
 Proyecto/
-├── Domain/                 # Núcleo del dominio
-│   ├── Entities/          # Entidades del negocio
-│   └── Enums/             # Enumeraciones
-├── Application/            # Lógica de aplicación
-│   ├── DTOs/              # Data Transfer Objects
-│   ├── Interfaces/        # Contratos de servicios y repositorios
-│   └── Services/          # Implementación de servicios
-├── Infrastructure/         # Acceso a datos
-│   ├── Data/              # DbContext y configuraciones
-│   └── Repositories/      # Implementación de repositorios
-└── Components/            # Capa de presentación (Blazor)
-    ├── Pages/             # Páginas Razor
-    └── Layout/            # Componentes de layout
+├── src/
+│   ├── Domain/                  # Capa de Dominio (Núcleo)
+│   │   ├── Entities/           # Entidades del negocio
+│   │   └── Enums/              # Enumeraciones
+│   ├── Application/             # Capa de Aplicación
+│   │   ├── DTOs/               # Data Transfer Objects
+│   │   ├── Interfaces/         # Contratos
+│   │   └── Services/           # Lógica de negocio
+│   └── Infrastructure/          # Capa de Infraestructura
+│       ├── Data/               # DbContext y configuraciones EF
+│       ├── Repositories/       # Acceso a datos
+│       └── Services/           # Servicios externos
+└── Components/                  # Capa de Presentación (Blazor)
+    ├── Pages/                  # Páginas Razor
+    └── Layout/                 # Componentes de layout
 ```
 
-## Requisitos
+## 🚀 Instalación y Configuración
 
-- .NET 8 SDK
-- SQL Server (LocalDB o instancia completa)
-- Visual Studio 2022 o VS Code
+### Requisitos Previos
 
-## Configuración
+- ✅ [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
+- ✅ SQL Server LocalDB (incluido con Visual Studio) o SQL Server completo
+- ✅ Editor: Visual Studio 2022, VS Code o Rider
 
-### 1. Cadena de Conexión
+### Pasos de Instalación
 
-Edita `appsettings.json` para configurar tu servidor SQL Server:
+#### 1️⃣ Clonar el repositorio
+
+```bash
+git clone https://github.com/tu-usuario/Sistema-Gestion-de-Incidentes.git
+cd Sistema-Gestion-de-Incidentes
+```
+
+#### 2️⃣ Configurar la cadena de conexión
+
+Edita el archivo `appsettings.json`:
 
 ```json
 {
   "ConnectionStrings": {
-    "DefaultConnection": "Server=(localdb)\\mssqllocaldb;Database=SistemaDITIC;Trusted_Connection=true;MultipleActiveResultSets=true"
+    "DefaultConnection": "Server=(localdb)\\mssqllocaldb;Database=SistemaIncidentes;Trusted_Connection=true;MultipleActiveResultSets=true"
   }
 }
 ```
 
-### 2. Crear la Base de Datos
+💡 **Nota**: Si usas SQL Server completo en lugar de LocalDB:
+```json
+"DefaultConnection": "Server=localhost;Database=SistemaIncidentes;Trusted_Connection=true;MultipleActiveResultSets=true"
+```
 
-Ejecuta los siguientes comandos en la terminal:
+#### 3️⃣ Restaurar dependencias
 
-```powershell
-# Restaurar paquetes
+```bash
 dotnet restore
+```
 
-# Crear migración inicial
-dotnet ef migrations add MigracionInicial
+#### 4️⃣ Aplicar migraciones y crear base de datos
 
-# Aplicar migración y crear base de datos
+```bash
 dotnet ef database update
 ```
 
-### 3. Ejecutar la Aplicación
+Este comando creará automáticamente:
+- ✅ La base de datos
+- ✅ Todas las tablas necesarias
+- ✅ Datos semilla (usuarios, etiquetas, servicios)
 
-```powershell
+#### 5️⃣ Ejecutar la aplicación
+
+```bash
 dotnet run
 ```
 
-La aplicación estará disponible en: `https://localhost:5001` o `http://localhost:5000`
+🌐 La aplicación estará disponible en: **http://localhost:5078**
 
-## Datos Iniciales
+## 👤 Usuarios de Prueba
 
-El sistema incluye datos semilla:
+El sistema incluye usuarios precargados para pruebas:
 
-### Usuarios
-- Admin Sistema (Técnico)
-- Juan Pérez (Usuario)
-- María García (Técnico - Soporte TI)
+| Usuario | Email | Contraseña | Rol | Nivel |
+|---------|-------|-----------|-----|-------|
+| Admin Sistema | admin@universidad.edu | Admin123! | Administrador | 5 |
+| Carlos Técnico | carlos@universidad.edu | Tecnico123! | Técnico Nivel 1 | 1 |
+| Ana López | ana@universidad.edu | Tecnico123! | Técnico Nivel 2 | 2 |
+| Luis Martín | luis@universidad.edu | Tecnico123! | Técnico Nivel 3 | 3 |
+| Pedro Sánchez | pedro@universidad.edu | Tecnico123! | Técnico Nivel 4 | 4 |
+| Juan Estudiante | juan@universidad.edu | Estudiante123! | Estudiante | 0 |
+| María García | maria@universidad.edu | Estudiante123! | Estudiante | 0 |
 
-### Servicios DITIC
-- Usuario Experto (L-V 8:00-17:00)
-- Ingeniería de Soporte (L-S 7:00-19:00)
-- Proveedor Externo (L-V 9:00-18:00)
+## 📖 Guía de Uso Rápida
 
-## Tecnologías
+### Como Estudiante
+1. Inicia sesión con tu cuenta
+2. Haz clic en **"Reportar Incidente"**
+3. Completa el formulario (título, descripción, prioridad, etiquetas)
+4. Da seguimiento al estado de tu incidente
+5. Máximo 3 incidentes activos simultáneamente
 
-- **Frontend**: Blazor Server
-- **Backend**: ASP.NET Core 8
-- **ORM**: Entity Framework Core 8
-- **Base de Datos**: SQL Server
-- **Arquitectura**: Onion Architecture
-- **Patrón**: Repository Pattern
-- **Inyección de Dependencias**: Built-in DI Container
+### Como Técnico
+1. Inicia sesión con cuenta de técnico
+2. Ve tus incidentes asignados en la lista
+3. Haz clic en **"Ver"** para revisar detalles
+4. **Resolver**: Marca como resuelto con descripción de solución
+5. **Escalar**: Envía a nivel superior si no puedes resolverlo
+6. Consulta/crea artículos en **Base de Conocimiento**
 
-## Próximas Mejoras
+### Como Administrador
+1. Accede con cuenta de administrador
+2. Ve TODOS los incidentes del sistema
+3. **Asignar**: Selecciona nivel y técnico específico
+4. **Resolver**: Soluciona directamente si es necesario
+5. **Descartar**: Cierra incidentes duplicados/irrelevantes con justificación
+6. Administra la base de conocimiento completa
 
-- [ ] Autenticación y autorización
-- [ ] Dashboard con estadísticas
-- [ ] Notificaciones por email
-- [ ] Archivos adjuntos en incidentes
-- [ ] Reportes y gráficas
-- [ ] API REST para integración
-- [ ] Sistema de comentarios en incidentes
-- [ ] Historial de cambios
-- [ ] SLA (Service Level Agreement) tracking
+## 🛠️ Tecnologías Utilizadas
 
-## Estructura de Datos
+| Categoría | Tecnología |
+|-----------|-----------|
+| **Frontend** | Blazor Server, Bootstrap 5, Font Awesome |
+| **Backend** | ASP.NET Core 8, C# 12 |
+| **Base de Datos** | SQL Server, Entity Framework Core 8 |
+| **Arquitectura** | Onion Architecture (Clean Architecture) |
+| **Patrones** | Repository Pattern, Dependency Injection, DTO Pattern |
+| **Autenticación** | Session Storage (navegador) |
+
+## 📊 Modelo de Datos
 
 ### Entidades Principales
 
-- **Incidente**: Registro de problemas reportados
-- **BaseConocimiento**: Artículos con soluciones
-- **Usuario**: Usuarios del sistema (estudiantes y técnicos)
-- **ServicioDITIC**: Niveles de servicio con horarios
+- **Incidente**: Tickets reportados con seguimiento completo
+- **BaseConocimiento**: Artículos de soluciones documentadas
+- **Usuario**: Estudiantes, técnicos y administradores
+- **Etiqueta**: Categorización de incidentes y artículos
+- **Prioridad**: Niveles de urgencia
 
-## Autor
+### Estados de Incidentes
 
-Sistema desarrollado para gestión de incidentes universitarios.
+- 🟦 **Abierto**: Recién creado, sin asignar
+- 🟩 **Asignado**: Asignado a un técnico
+- 🟨 **Escalado**: Enviado a nivel superior
+- ✅ **Resuelto**: Problema solucionado
+- ⚫ **Descartado**: Cerrado administrativamente
+
+## 🔄 Flujo de Trabajo
+
+```
+Estudiante crea incidente
+         ↓
+    [Abierto]
+         ↓
+Admin asigna → [Asignado] → Técnico recibe
+         ↓                       ↓
+    Resuelve              ¿Puede resolver?
+         ↓                       ↓
+    [Resuelto]         No → [Escalado] → Nivel superior
+                                ↓
+                           [Resuelto]
+```
+
+## 🤝 Contribuciones
+
+Este es un proyecto educativo. Si deseas contribuir:
+
+1. Haz fork del repositorio
+2. Crea una rama para tu feature (`git checkout -b feature/NuevaCaracteristica`)
+3. Commit tus cambios (`git commit -m 'Agregar nueva característica'`)
+4. Push a la rama (`git push origin feature/NuevaCaracteristica`)
+5. Abre un Pull Request
+
+## 📄 Licencia
+
+Este proyecto es de código abierto para propósitos educativos.
+
+## 📧 Contacto
+
+Para preguntas o sugerencias, abre un issue en el repositorio.
+
+---
+
+**Desarrollado con ❤️ para gestión eficiente de incidentes técnicos**

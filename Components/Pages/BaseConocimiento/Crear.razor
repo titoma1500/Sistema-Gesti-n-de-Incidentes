@@ -1,0 +1,175 @@
+@page "/base-conocimiento/crear"
+@rendermode InteractiveServer
+@using Proyecto.Application.DTOs.BaseConocimiento
+@using Proyecto.Application.DTOs.Etiqueta
+@using Proyecto.Application.Interfaces
+@inject IBaseConocimientoService BaseConocimientoService
+@inject IEtiquetaService EtiquetaService
+@inject ISessionService SessionService
+@inject NavigationManager Navigation
+
+<h3>Crear Artículo de Base de Conocimiento</h3>
+
+@if (cargando)
+{
+    <p><em>Cargando...</em></p>
+}
+else if (!tieneAcceso)
+{
+    <div class="alert alert-danger">
+        <h4>Acceso Denegado</h4>
+        <p>No tienes permisos para crear artículos. Esta función es solo para técnicos y administradores.</p>
+        <button class="btn btn-primary" @onclick='() => Navigation.NavigateTo("/incidentes/crear")'>
+            Ir a Crear Incidente
+        </button>
+    </div>
+}
+else
+{
+    <div class="card">
+    <div class="card-body">
+        <EditForm Model="nuevoArticulo" OnValidSubmit="CrearArticulo" FormName="crearArticuloForm">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+
+            <div class="mb-3">
+                <label class="form-label">Título</label>
+                <InputText @bind-Value="nuevoArticulo.Titulo" class="form-control" placeholder="Título del artículo" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Descripción del Problema</label>
+                <InputTextArea @bind-Value="nuevoArticulo.Descripcion" class="form-control" rows="4" placeholder="Describe el problema o situación" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Solución</label>
+                <InputTextArea @bind-Value="nuevoArticulo.Solucion" class="form-control" rows="6" placeholder="Describe la solución paso a paso" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Etiquetas (máximo 2)</label>
+                @if (nuevoArticulo.EtiquetasIds.Count >= 2)
+                {
+                    <div class="alert alert-info mt-2">
+                        <small>Máximo 2 etiquetas seleccionadas</small>
+                    </div>
+                }
+                <div class="row">
+                    @foreach (var etiqueta in etiquetas)
+                    {
+                        <div class="col-md-4 mb-2">
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" id="etiqueta-@etiqueta.Id"
+                                       checked="@nuevoArticulo.EtiquetasIds.Contains(etiqueta.Id)"
+                                       disabled="@(!nuevoArticulo.EtiquetasIds.Contains(etiqueta.Id) && nuevoArticulo.EtiquetasIds.Count >= 2)"
+                                       @onchange="@(() => ToggleEtiqueta(etiqueta.Id))" />
+                                <label class="form-check-label" for="etiqueta-@etiqueta.Id">
+                                    @etiqueta.Nombre
+                                </label>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary">Crear Artículo</button>
+                <button type="button" class="btn btn-secondary" @onclick="Cancelar">Cancelar</button>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(mensaje))
+{
+    <div class="alert alert-success mt-3">
+        @mensaje
+    </div>
+}
+}
+
+@code {
+    [SupplyParameterFromForm]
+    private CrearArticuloDto nuevoArticulo { get; set; } = new() 
+    { 
+        EtiquetasIds = new List<int>()
+    };
+    
+    private List<EtiquetaDto> etiquetas = new();
+    private string mensaje = string.Empty;
+    private bool cargando = true;
+    private bool tieneAcceso = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            var usuario = await SessionService.GetUsuarioActualAsync();
+            if (usuario == null)
+            {
+                Navigation.NavigateTo("/login");
+                return;
+            }
+            
+            tieneAcceso = usuario.Nivel >= 1;
+            cargando = false;
+            
+            if (!tieneAcceso)
+            {
+                StateHasChanged();
+                return;
+            }
+            
+            nuevoArticulo.CreadoPorId = usuario.Id;
+            
+            try
+            {
+                var todasEtiquetas = await EtiquetaService.ObtenerTodasAsync();
+                etiquetas = todasEtiquetas.ToList();
+            }
+            catch (Exception ex)
+            {
+                mensaje = $"Error al cargar etiquetas: {ex.Message}";
+            }
+            
+            StateHasChanged();
+        }
+    }
+
+    private void ToggleEtiqueta(int etiquetaId)
+    {
+        if (nuevoArticulo.EtiquetasIds.Contains(etiquetaId))
+        {
+            nuevoArticulo.EtiquetasIds.Remove(etiquetaId);
+        }
+        else
+        {
+            nuevoArticulo.EtiquetasIds.Add(etiquetaId);
+        }
+    }
+
+    private async Task CrearArticulo()
+    {
+        try
+        {
+            await BaseConocimientoService.CrearAsync(nuevoArticulo);
+            mensaje = "Artículo creado exitosamente";
+            
+            // Esperar un momento para mostrar el mensaje
+            await Task.Delay(1500);
+            
+            // Redirigir a la lista
+            Navigation.NavigateTo("/conocimiento");
+        }
+        catch (Exception ex)
+        {
+            mensaje = $"Error al crear artículo: {ex.Message}";
+        }
+    }
+
+    private void Cancelar()
+    {
+        Navigation.NavigateTo("/conocimiento");
+    }
+}
