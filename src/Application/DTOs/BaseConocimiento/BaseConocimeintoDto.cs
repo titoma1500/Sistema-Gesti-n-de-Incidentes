@@ -1,0 +1,26 @@
+namespace Proyecto.Application.DTOs.BaseConocimiento;
+
+public class BaseConocimientoDto
+{
+    public int Id { get; set; }
+    public string Titulo { get; set; } = string.Empty;
+    public string Descripcion { get; set; } = string.Empty;
+    public string Solucion { get; set; } = string.Empty;
+    public List<string> Etiquetas { get; set; } = new();
+    public int VecesConsultada { get; set; }
+    public DateTime FechaCreacion { get; set; }
+}
+
+public class CrearBaseConocimientoDto
+{
+    public string Titulo { get; set; } = string.Empty;
+    public string Descripcion { get; set; } = string.Empty;
+    public string Solucion { get; set; } = string.Empty;
+    public List<int> EtiquetasIds { get; set; } = new();
+}
+
+public class BuscarBaseConocimientoDto
+{
+    public string? TextoBusqueda { get; set; }
+    public List<int>? EtiquetasIds { get; set; }
+}
