@@ -19,4 +19,9 @@
     </PackageReference>
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="src\Application\DTOs\Auth\" />
+    <Folder Include="src\Application\DTOs\BaseConocimiento\" />
+  </ItemGroup>
+
 </Project>
