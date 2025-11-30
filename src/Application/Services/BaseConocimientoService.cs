@@ -93,6 +93,17 @@ public class BaseConocimientoService : IBaseConocimientoService
         await _baseConocimientoRepository.IncrementarConsultasAsync(id);
     }
 
+    public async Task EliminarAsync(int id)
+    {
+        var articulo = await _baseConocimientoRepository.ObtenerPorIdAsync(id);
+        if (articulo == null)
+        {
+            throw new InvalidOperationException("El artículo no existe");
+        }
+
+        await _baseConocimientoRepository.EliminarAsync(id);
+    }
+
     public async Task<IEnumerable<BaseConocimientoDto>> ObtenerPorEtiquetasAsync(List<string> etiquetas)
     {
         if (etiquetas == null || !etiquetas.Any())

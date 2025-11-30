@@ -62,12 +62,23 @@ else
                             <div class="mb-2">
                                 @foreach (var etiqueta in articulo.Etiquetas)
                                 {
-                                    <span class="badge bg-info me-1">@etiqueta</span>
+                                    <span class="badge bg-info me-1"><i class="fas fa-tag me-1"></i>@etiqueta</span>
                                 }
                             </div>
                             <small class="text-muted">
-                                Consultado @articulo.VecesConsultada veces
+                                <i class="fas fa-eye me-1"></i>Consultado @articulo.VecesConsultada veces
                             </small>
+                        </div>
+                        <div class="card-footer d-flex justify-content-between">
+                            <button class="btn btn-sm btn-primary" @onclick="() => VerSolucion(articulo)">
+                                <i class="fas fa-book-open me-1"></i>Ver Solución
+                            </button>
+                            @if (nivelUsuario == 5)
+                            {
+                                <button class="btn btn-sm btn-danger" @onclick="() => MostrarConfirmacionEliminar(articulo)">
+                                    <i class="fas fa-trash me-1"></i>Eliminar
+                                </button>
+                            }
                         </div>
                     </div>
                 </div>
@@ -77,12 +88,97 @@ else
     </div>
 }
 
+<!-- Modal Ver Solución -->
+@if (mostrarModalSolucion && articuloSeleccionado != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title"><i class="fas fa-book-open me-2"></i>@articuloSeleccionado.Titulo</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="CerrarModales"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <h6><i class="fas fa-info-circle me-1"></i>Descripción:</h6>
+                        <p>@articuloSeleccionado.Descripcion</p>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <h6><i class="fas fa-check-circle me-1"></i>Solución:</h6>
+                        <div class="bg-light p-3 rounded">
+                            <p style="white-space: pre-wrap;">@articuloSeleccionado.Solucion</p>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <h6><i class="fas fa-tags me-1"></i>Etiquetas:</h6>
+                        @foreach (var etiqueta in articuloSeleccionado.Etiquetas)
+                        {
+                            <span class="badge bg-info me-1"><i class="fas fa-tag me-1"></i>@etiqueta</span>
+                        }
+                    </div>
+                    
+                    <div>
+                        <small class="text-muted">
+                            <i class="fas fa-eye me-1"></i>Consultado @articuloSeleccionado.VecesConsultada veces
+                        </small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CerrarModales">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Modal Confirmar Eliminación -->
+@if (mostrarModalEliminar && articuloSeleccionado != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title"><i class="fas fa-exclamation-triangle me-2"></i>Confirmar Eliminación</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="CerrarModales"></button>
+                </div>
+                <div class="modal-body">
+                    <p>¿Estás seguro que deseas eliminar este artículo?</p>
+                    <div class="alert alert-warning">
+                        <strong>Título:</strong> @articuloSeleccionado.Titulo<br />
+                        <small>Esta acción no se puede deshacer.</small>
+                    </div>
+                    
+                    @if (!string.IsNullOrEmpty(mensajeEliminar))
+                    {
+                        <div class="alert @(mensajeEliminarExito ? "alert-success" : "alert-danger")">
+                            @mensajeEliminar
+                        </div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CerrarModales">Cancelar</button>
+                    <button type="button" class="btn btn-danger" @onclick="EliminarArticulo">
+                        <i class="fas fa-trash me-1"></i>Eliminar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     private List<BaseConocimientoDto>? articulos;
     private string textoBusqueda = string.Empty;
     private bool cargando = true;
     private bool tieneAcceso = false;
     private int nivelUsuario = 0;
+    private bool mostrarModalSolucion = false;
+    private bool mostrarModalEliminar = false;
+    private BaseConocimientoDto? articuloSeleccionado;
+    private string? mensajeEliminar;
+    private bool mensajeEliminarExito = false;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -133,5 +229,49 @@ else
     private void IrACrearIncidente()
     {
         Navigation.NavigateTo("/incidentes/crear");
+    }
+    
+    private async Task VerSolucion(BaseConocimientoDto articulo)
+    {
+        articuloSeleccionado = articulo;
+        await BaseConocimientoService.IncrementarConsultasAsync(articulo.Id);
+        mostrarModalSolucion = true;
+    }
+    
+    private void MostrarConfirmacionEliminar(BaseConocimientoDto articulo)
+    {
+        articuloSeleccionado = articulo;
+        mensajeEliminar = null;
+        mostrarModalEliminar = true;
+    }
+    
+    private async Task EliminarArticulo()
+    {
+        if (articuloSeleccionado == null) return;
+        
+        try
+        {
+            await BaseConocimientoService.EliminarAsync(articuloSeleccionado.Id);
+            mensajeEliminar = "Artículo eliminado correctamente";
+            mensajeEliminarExito = true;
+            
+            await Task.Delay(1500);
+            CerrarModales();
+            await BuscarArticulos();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            mensajeEliminar = $"Error al eliminar: {ex.Message}";
+            mensajeEliminarExito = false;
+        }
+    }
+    
+    private void CerrarModales()
+    {
+        mostrarModalSolucion = false;
+        mostrarModalEliminar = false;
+        articuloSeleccionado = null;
+        mensajeEliminar = null;
     }
 }

@@ -18,7 +18,7 @@ Sistema completo de gestión de incidentes con base de conocimiento integrada, d
 - **Artículos de soluciones**: Documentación de problemas comunes y sus resoluciones
 - **Búsqueda inteligente**: Por título, descripción y etiquetas
 - **Sugerencias automáticas**: Soluciones relacionadas mostradas al resolver incidentes
-- **Gestión completa**: Crear, editar y eliminar artículos (solo técnicos/admin)
+- **Gestión completa**: Crear y eliminar artículos (solo admin)
 
 ### 👥 Sistema de Usuarios
 - **Estudiantes (Nivel 0)**: Crear y consultar sus incidentes

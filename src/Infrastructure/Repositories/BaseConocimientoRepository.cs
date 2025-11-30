@@ -75,4 +75,14 @@ public class BaseConocimientoRepository : IBaseConocimientoRepository
             await _context.SaveChangesAsync();
         }
     }
+
+    public async Task EliminarAsync(int id)
+    {
+        var articulo = await _context.BaseConocimiento.FindAsync(id);
+        if (articulo != null)
+        {
+            _context.BaseConocimiento.Remove(articulo);
+            await _context.SaveChangesAsync();
+        }
+    }
 }

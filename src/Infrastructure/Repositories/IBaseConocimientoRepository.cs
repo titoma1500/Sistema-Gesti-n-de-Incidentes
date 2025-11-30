@@ -11,4 +11,5 @@ public interface IBaseConocimientoRepository
     Task<BaseConocimiento> CrearAsync(BaseConocimiento articulo);
     Task ActualizarAsync(BaseConocimiento articulo);
     Task IncrementarConsultasAsync(int id);
+    Task EliminarAsync(int id);
 }

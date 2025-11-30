@@ -10,4 +10,5 @@ public interface IBaseConocimientoService
     Task<IEnumerable<BaseConocimientoDto>> ObtenerPorEtiquetasAsync(List<string> etiquetas);
     Task<BaseConocimientoDto> CrearAsync(CrearArticuloDto dto);
     Task IncrementarConsultasAsync(int id);
+    Task EliminarAsync(int id);
 }
