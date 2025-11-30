@@ -7,7 +7,7 @@ El sistema incluye usuarios precargados para facilitar las pruebas de cada rol.
 ### 🛡️ Administrador (Nivel 5)
 ```
 Email: admin@universidad.edu
-Contraseña: Admin123!
+Contraseña: admin123
 ```
 **Permisos:**
 - ✅ Ver todos los incidentes del sistema
@@ -21,7 +21,7 @@ Contraseña: Admin123!
 ### ⚙️ Técnico Nivel 4 (Pedro Sánchez)
 ```
 Email: pedro@universidad.edu
-Contraseña: Tecnico123!
+Contraseña: tecnico123
 ```
 **Permisos:**
 - ✅ Ver incidentes asignados a él
@@ -34,7 +34,7 @@ Contraseña: Tecnico123!
 ### ⚙️ Técnico Nivel 3 (Luis Martín)
 ```
 Email: luis@universidad.edu
-Contraseña: Tecnico123!
+Contraseña: tecnico123
 ```
 **Permisos:**
 - ✅ Ver incidentes asignados
@@ -47,7 +47,7 @@ Contraseña: Tecnico123!
 ### ⚙️ Técnico Nivel 2 (Ana López)
 ```
 Email: ana@universidad.edu
-Contraseña: Tecnico123!
+Contraseña: tecnico123
 ```
 **Permisos:**
 - ✅ Ver incidentes asignados
@@ -60,7 +60,7 @@ Contraseña: Tecnico123!
 ### ⚙️ Técnico Nivel 1 (Carlos Técnico)
 ```
 Email: carlos@universidad.edu
-Contraseña: Tecnico123!
+Contraseña: tecnico123
 ```
 **Permisos:**
 - ✅ Ver incidentes asignados
@@ -73,7 +73,7 @@ Contraseña: Tecnico123!
 ### 🎓 Estudiante 1 (Juan Estudiante)
 ```
 Email: juan@universidad.edu
-Contraseña: Estudiante123!
+Contraseña: tecnico123
 ```
 **Permisos:**
 - ✅ Crear nuevos incidentes (máximo 3 activos)
@@ -85,7 +85,7 @@ Contraseña: Estudiante123!
 ### 🎓 Estudiante 2 (María García)
 ```
 Email: maria@universidad.edu
-Contraseña: Estudiante123!
+Contraseña: tecnico123
 ```
 **Permisos:**
 - ✅ Crear nuevos incidentes (máximo 3 activos)

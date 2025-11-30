@@ -121,13 +121,13 @@ El sistema incluye usuarios precargados para pruebas:
 
 | Usuario | Email | Contraseña | Rol | Nivel |
 |---------|-------|-----------|-----|-------|
-| Admin Sistema | admin@universidad.edu | Admin123! | Administrador | 5 |
-| Carlos Técnico | carlos@universidad.edu | Tecnico123! | Técnico Nivel 1 | 1 |
-| Ana López | ana@universidad.edu | Tecnico123! | Técnico Nivel 2 | 2 |
-| Luis Martín | luis@universidad.edu | Tecnico123! | Técnico Nivel 3 | 3 |
-| Pedro Sánchez | pedro@universidad.edu | Tecnico123! | Técnico Nivel 4 | 4 |
-| Juan Estudiante | juan@universidad.edu | Estudiante123! | Estudiante | 0 |
-| María García | maria@universidad.edu | Estudiante123! | Estudiante | 0 |
+| Admin Sistema | admin@universidad.edu | admin123 | Administrador | 5 |
+| Carlos Técnico | carlos@universidad.edu | tecnico123 | Técnico Nivel 1 | 1 |
+| Ana López | ana@universidad.edu | tecnico123 | Técnico Nivel 2 | 2 |
+| Luis Martín | luis@universidad.edu | tecnico123 | Técnico Nivel 3 | 3 |
+| Pedro Sánchez | pedro@universidad.edu | tecnico123 | Técnico Nivel 4 | 4 |
+| Juan Estudiante | juan@universidad.edu | tecnico123 | Estudiante | 0 |
+| María García | maria@universidad.edu | tecnico123 | Estudiante | 0 |
 
 ## 📖 Guía de Uso Rápida
 
