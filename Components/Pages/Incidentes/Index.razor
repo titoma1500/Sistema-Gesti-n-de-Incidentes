@@ -1,15 +1,16 @@
 @page "/incidentes"
-@rendermode InteractiveServer
 @using Proyecto.Application.DTOs.Incidentes
 @using Proyecto.Application.DTOs.Auth
 @using Proyecto.Application.DTOs.BaseConocimiento
 @using Proyecto.Application.Interfaces
 @using Proyecto.Domain.Enums
+@using Microsoft.AspNetCore.SignalR.Client
 @inject IIncidenteService IncidenteService
 @inject IAuthService AuthService
 @inject IBaseConocimientoService BaseConocimientoService
 @inject ISessionService SessionService
 @inject NavigationManager Navigation
+@implements IAsyncDisposable
 
 <PageTitle>Gestión de Incidentes</PageTitle>
 
@@ -127,18 +128,21 @@ else
                             <td>
                                 <div class="d-flex flex-wrap gap-1">
                                     <button class="btn btn-sm btn-primary" 
+                                            title="Ver detalles del incidente"
                                             @onclick="() => VerDetalle(incidente.Id)">
                                         <i class="fas fa-eye"></i>
                                     </button>
                                     @if (esAdmin)
                                     {
                                         <button class="btn btn-sm btn-warning" 
+                                                title="Asignar a técnico"
                                                 @onclick="() => MostrarAsignar(incidente)">
                                             <i class="fas fa-user-plus"></i>
                                         </button>
-                                        @if (incidente.UsuarioAsignadoId == null)
+                                        @if (incidente.Estado != "Resuelto" && incidente.Estado != "Descartado")
                                         {
                                             <button class="btn btn-sm btn-success" 
+                                                    title="Resolver incidente"
                                                     @onclick="() => MostrarResolver(incidente)">
                                                 <i class="fas fa-check"></i>
                                             </button>
@@ -146,6 +150,7 @@ else
                                         @if (incidente.Estado != "Resuelto" && incidente.Estado != "Descartado")
                                         {
                                             <button class="btn btn-sm btn-danger" 
+                                                    title="Descartar incidente"
                                                     @onclick="() => MostrarDescartar(incidente)">
                                                 <i class="fas fa-times"></i>
                                             </button>
@@ -154,16 +159,18 @@ else
                                     else if (!esEstudiante)
                                     {
                                         <!-- Botones para técnicos -->
-                                        @if (incidente.Estado != "Resuelto")
+                                        @if (incidente.Estado != "Resuelto" && incidente.Estado != "Descartado")
                                         {
                                             <button class="btn btn-sm btn-success" 
+                                                    title="Resolver incidente"
                                                     @onclick="() => MostrarResolver(incidente)">
                                                 <i class="fas fa-check"></i>
                                             </button>
                                         }
-                                        @if (nivelUsuario < 4 && incidente.Estado != "Resuelto")
+                                        @if (nivelUsuario < 4 && incidente.Estado != "Resuelto" && incidente.Estado != "Descartado")
                                         {
                                             <button class="btn btn-sm btn-warning" 
+                                                    title="Escalar a nivel superior"
                                                     @onclick="() => MostrarEscalar(incidente)">
                                                 <i class="fas fa-arrow-up"></i>
                                             </button>
@@ -214,7 +221,7 @@ else
                         </div>
                     </div>
 
-                    <EditForm Model="asignarDto" OnValidSubmit="AsignarIncidente" FormName="asignarFormModal">
+                    <EditForm Model="asignarDto" OnValidSubmit="AsignarIncidente">
                         <div class="mb-3">
                             <label class="form-label">Seleccionar Nivel:</label>
                             <select class="form-select" @onchange="CambiarNivelAsignacion">
@@ -354,7 +361,7 @@ else
                         </div>
                     }
 
-                    <EditForm Model="resolverDto" OnValidSubmit="ResolverIncidente" FormName="resolverFormModal">
+                    <EditForm Model="resolverDto" OnValidSubmit="ResolverIncidente">
                         <div class="mb-3">
                             <label class="form-label">Resolución:</label>
                             <InputTextArea class="form-control" rows="4" @bind-Value="resolverDto.Resolucion" placeholder="Describe cómo se resolvió el incidente..." required />
@@ -415,7 +422,7 @@ else
                         <i class="bi bi-info-circle"></i> Puedes escalar este incidente a un nivel superior (hasta Nivel 4)
                     </div>
 
-                    <EditForm Model="escalarDto" FormName="escalarFormModal">
+                    <EditForm Model="escalarDto">
                         <div class="mb-3">
                             <label class="form-label">Seleccionar Nivel de Escalamiento:</label>
                             <InputSelect class="form-select" @bind-Value="escalarDto.NuevoNivel" @bind-Value:after="OnNivelEscalamientoChanged">
@@ -488,7 +495,7 @@ else
                         <p><strong>Reportado por:</strong> @incidenteSeleccionado.UsuarioReportaNombre</p>
                     </div>
 
-                    <EditForm Model="descartarDto" FormName="descartarFormModal">
+                    <EditForm Model="descartarDto">
                         <div class="mb-3">
                             <label class="form-label">Motivo del Descarte <span class="text-danger">*</span></label>
                             <small class="form-text text-muted d-block mb-2">
@@ -524,6 +531,7 @@ else
     private int usuarioId = 0;
     private int nivelUsuario = 0;
     private string tituloSeccion = "Incidentes";
+    private UsuarioResponseDto? usuarioActual;
     
     // Modal Asignar
     private bool mostrarModalAsignar = false;
@@ -532,7 +540,6 @@ else
     private string? mensajeAsignar;
     private bool mensajeAsignarExito;
     
-    [SupplyParameterFromForm]
     private AsignarIncidenteDto asignarDto { get; set; } = new();
     
     // Modal Resolver
@@ -542,7 +549,6 @@ else
     private List<BaseConocimientoDto> solucionesSugeridas = new();
     private BaseConocimientoDto? solucionSeleccionada;
     
-    [SupplyParameterFromForm]
     private ResolverIncidenteDto resolverDto { get; set; } = new();
     
     // Modal Escalar
@@ -551,7 +557,6 @@ else
     private string? mensajeEscalar;
     private bool mensajeEscalarExito;
     
-    [SupplyParameterFromForm]
     private EscalarIncidenteDto escalarDto { get; set; } = new();
     
     // Modal Descartar
@@ -559,8 +564,9 @@ else
     private string? mensajeDescartar;
     private bool mensajeDescartarExito;
     
-    [SupplyParameterFromForm]
     private DescartarIncidenteDto descartarDto { get; set; } = new();
+    
+    private HubConnection? hubConnection;
     
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -587,29 +593,75 @@ else
             cargando = false;
             
             await CargarIncidentes();
+            await InicializarSignalR();
             StateHasChanged();
+        }
+    }
+    
+    private async Task InicializarSignalR()
+    {
+        try
+        {
+            Console.WriteLine($"[Index] Iniciando SignalR para {(esEstudiante ? "Estudiante" : esAdmin ? "Admin" : "Técnico")} (usuarioId: {usuarioId})...");
+            
+            hubConnection = new HubConnectionBuilder()
+                .WithUrl(Navigation.ToAbsoluteUri("/notificacionhub"))
+                .WithAutomaticReconnect()
+                .Build();
+
+            // Escuchar actualizaciones de incidentes (este evento se envía a TODOS con Clients.All)
+            hubConnection.On<int, string>("ActualizarIncidentes", async (incidenteId, accion) =>
+            {
+                try
+                {
+                    Console.WriteLine($"[Index-{(esEstudiante ? "Estudiante" : esAdmin ? "Admin" : "Técnico")}] ✓ SignalR recibió evento: Incidente {incidenteId} {accion}");
+                    Console.WriteLine($"[Index] Recargando incidentes para usuarioId: {usuarioId}");
+                    
+                    await CargarIncidentes();
+                    await InvokeAsync(StateHasChanged);
+                    
+                    Console.WriteLine($"[Index] ✓ Lista actualizada, ahora tiene {incidentes?.Count ?? 0} incidentes");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[Index] ✗ Error al procesar ActualizarIncidentes: {ex.Message}");
+                }
+            });
+
+            await hubConnection.StartAsync();
+            Console.WriteLine($"[Index] ✓✓✓ SignalR CONECTADO exitosamente para {(esEstudiante ? "Estudiante" : esAdmin ? "Admin" : "Técnico")}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Index] ✗✗✗ ERROR CRÍTICO al conectar SignalR: {ex.Message}");
+            Console.WriteLine($"[Index] Stack trace: {ex.StackTrace}");
         }
     }
 
     private async Task CargarIncidentes()
     {
+        Console.WriteLine($"[Index] CargarIncidentes - esEstudiante: {esEstudiante}, usuarioId: {usuarioId}");
+        
         if (esEstudiante)
         {
             // Estudiantes solo ven sus propios incidentes reportados
             var resultado = await IncidenteService.ObtenerPorUsuarioAsync(usuarioId);
             incidentes = resultado.ToList();
+            Console.WriteLine($"[Index] Estudiante cargó {incidentes.Count} incidentes");
         }
         else if (esAdmin)
         {
             // Admin ve todos los incidentes
             var resultado = await IncidenteService.ObtenerTodosAsync();
             incidentes = resultado.ToList();
+            Console.WriteLine($"[Index] Admin cargó {incidentes.Count} incidentes");
         }
         else
         {
             // Técnicos solo ven incidentes asignados a ellos
             var resultado = await IncidenteService.ObtenerPorAsignadoAsync(usuarioId);
             incidentes = resultado.ToList();
+            Console.WriteLine($"[Index] Técnico cargó {incidentes.Count} incidentes");
         }
     }
 
@@ -709,12 +761,27 @@ else
     {
         try
         {
+            // CRÍTICO: Recargar usuario de sesión antes de cualquier operación
+            usuarioActual = await SessionService.GetUsuarioActualAsync();
+            
+            if (usuarioActual == null || usuarioActual.Nivel != 5)
+            {
+                mensajeAsignar = "Solo los administradores pueden asignar incidentes";
+                mensajeAsignarExito = false;
+                return;
+            }
+            
             if (asignarDto.UsuarioAsignadoId <= 0)
             {
                 mensajeAsignar = "Debe seleccionar un técnico";
                 mensajeAsignarExito = false;
                 return;
             }
+            
+            // CRÍTICO: Asegurar que UsuarioActualId esté establecido
+            asignarDto.UsuarioActualId = usuarioActual.Id;
+            
+            Console.WriteLine($"[Index] Asignando incidente - UsuarioActualId: {asignarDto.UsuarioActualId}, UsuarioAsignadoId: {asignarDto.UsuarioAsignadoId}");
             
             await IncidenteService.AsignarAsync(asignarDto);
             mensajeAsignar = "✓ Incidente asignado correctamente";
@@ -757,12 +824,25 @@ else
     {
         try
         {
+            // CRÍTICO: Recargar usuario de sesión
+            usuarioActual = await SessionService.GetUsuarioActualAsync();
+            
+            if (usuarioActual == null || usuarioActual.Nivel < 1)
+            {
+                mensajeResolver = "Solo técnicos y administradores pueden resolver incidentes";
+                mensajeResolverExito = false;
+                return;
+            }
+            
             if (string.IsNullOrWhiteSpace(resolverDto.Resolucion))
             {
                 mensajeResolver = "Debe proporcionar una resolución";
                 mensajeResolverExito = false;
                 return;
             }
+            
+            // Asegurar UsuarioActualId
+            resolverDto.UsuarioActualId = usuarioActual.Id;
             
             await IncidenteService.ResolverAsync(resolverDto);
             mensajeResolver = "✓ Incidente marcado como resuelto";
@@ -828,6 +908,16 @@ else
     {
         try
         {
+            // CRÍTICO: Recargar usuario de sesión
+            usuarioActual = await SessionService.GetUsuarioActualAsync();
+            
+            if (usuarioActual == null || usuarioActual.Nivel < 1 || usuarioActual.Nivel > 3)
+            {
+                mensajeEscalar = "Solo técnicos de nivel 1-3 pueden escalar incidentes";
+                mensajeEscalarExito = false;
+                return;
+            }
+            
             if (escalarDto.NuevoNivel <= 0)
             {
                 mensajeEscalar = "Debe seleccionar un nivel de escalamiento";
@@ -848,6 +938,9 @@ else
                 mensajeEscalarExito = false;
                 return;
             }
+            
+            // Asegurar UsuarioActualId
+            escalarDto.UsuarioActualId = usuarioActual.Id;
             
             await IncidenteService.EscalarAsync(escalarDto);
             mensajeEscalar = "✓ Incidente escalado correctamente al Nivel " + escalarDto.NuevoNivel;
@@ -878,12 +971,25 @@ else
     {
         try
         {
+            // CRÍTICO: Recargar usuario de sesión
+            usuarioActual = await SessionService.GetUsuarioActualAsync();
+            
+            if (usuarioActual == null || usuarioActual.Nivel != 5)
+            {
+                mensajeDescartar = "Solo el administrador puede descartar incidentes";
+                mensajeDescartarExito = false;
+                return;
+            }
+            
             if (string.IsNullOrWhiteSpace(descartarDto.MotivoDescarte))
             {
                 mensajeDescartar = "Debe proporcionar el motivo del descarte";
                 mensajeDescartarExito = false;
                 return;
             }
+            
+            // Asegurar UsuarioActualId
+            descartarDto.UsuarioActualId = usuarioActual.Id;
             
             await IncidenteService.DescartarAsync(descartarDto);
             mensajeDescartar = "✓ Incidente descartado correctamente";
@@ -916,5 +1022,13 @@ else
         mensajeResolver = null;
         mensajeEscalar = null;
         mensajeDescartar = null;
+    }
+    
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection != null)
+        {
+            await hubConnection.DisposeAsync();
+        }
     }
 }

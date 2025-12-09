@@ -1,0 +1,343 @@
+@using Microsoft.AspNetCore.SignalR.Client
+@inject NavigationManager Navigation
+@inject INotificacionService NotificacionService
+@inject ISessionService SessionService
+@implements IAsyncDisposable
+
+<div class="notification-container">
+    <button class="btn btn-link position-relative" @onclick="ToggleDropdown" title="Notificaciones">
+        <i class="fas fa-bell" style="font-size: 1.2rem; color: #ffc107; filter: drop-shadow(0 0 2px rgba(0,0,0,0.5));"></i>
+        @if (notificacionesNoLeidas > 0)
+        {
+            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                @notificacionesNoLeidas
+                <span class="visually-hidden">notificaciones no leídas</span>
+            </span>
+        }
+    </button>
+
+    @if (mostrarDropdown)
+    {
+        <div class="notification-dropdown">
+            <div class="notification-header">
+                <h6 class="mb-0">Notificaciones</h6>
+                @if (notificaciones.Any(n => !n.Leida))
+                {
+                    <button class="btn btn-sm btn-link" @onclick="MarcarTodasLeidas">
+                        Marcar todas como leídas
+                    </button>
+                }
+            </div>
+            <div class="notification-list">
+                @if (notificaciones.Any())
+                {
+                    @foreach (var notificacion in notificaciones)
+                    {
+                        <div class="notification-item @(!notificacion.Leida ? "unread" : "") @GetNotificacionClass(notificacion.Tipo)"
+                             @onclick="() => MarcarLeida(notificacion.Id)">
+                            <div class="notification-icon">
+                                <i class="fas @GetNotificacionIcon(notificacion.Tipo)"></i>
+                            </div>
+                            <div class="notification-content">
+                                <p class="mb-1">@notificacion.Mensaje</p>
+                                <small class="text-muted">@GetTiempoTranscurrido(notificacion.Fecha)</small>
+                            </div>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div class="notification-empty">
+                        <i class="fas fa-inbox"></i>
+                        <p>No hay notificaciones</p>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private HubConnection? hubConnection;
+    private List<Notificacion> notificaciones = new();
+    private int notificacionesNoLeidas = 0;
+    private bool mostrarDropdown = false;
+    private int usuarioId;
+    private bool inicializado = false;
+    private System.Threading.Timer? timer;
+
+    protected override void OnInitialized()
+    {
+        // Timer para verificar sesión y inicializar cuando esté disponible
+        timer = new System.Threading.Timer(async _ => await VerificarEInicializar(), null, TimeSpan.Zero, TimeSpan.FromMilliseconds(500));
+    }
+
+    private async Task VerificarEInicializar()
+    {
+        if (!inicializado)
+        {
+            try
+            {
+                var usuario = await SessionService.GetUsuarioActualAsync();
+                
+                if (usuario != null)
+                {
+                    Console.WriteLine($"[Notificaciones] ✓ Usuario detectado: {usuario.Nombre}");
+                    usuarioId = usuario.Id;
+                    inicializado = true;
+                    timer?.Dispose(); // Detener timer PRIMERO
+                    await CargarNotificaciones();
+                    await InicializarSignalR();
+                    await InvokeAsync(StateHasChanged);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Notificaciones] Error verificando sesión: {ex.Message}");
+            }
+        }
+    }
+
+    private async Task InicializarSignalR()
+    {
+        try
+        {
+            hubConnection = new HubConnectionBuilder()
+                .WithUrl(Navigation.ToAbsoluteUri("/notificacionhub"))
+                .WithAutomaticReconnect()
+                .Build();
+
+            // Evento genérico de notificación
+            hubConnection.On<string, string>("RecibirNotificacion", async (mensaje, tipo) =>
+            {
+                Console.WriteLine($"[Notificaciones] ✓ SignalR - Notificación recibida: {mensaje}");
+                await CargarNotificaciones();
+                await InvokeAsync(StateHasChanged);
+            });
+
+            // Notificación de asignación
+            hubConnection.On<int, int, string>("NotificarAsignacion", async (usuarioId, incidenteId, titulo) =>
+            {
+                if (usuarioId == this.usuarioId)
+                {
+                    Console.WriteLine($"[Notificaciones] ✓ Incidente asignado: {titulo}");
+                    await CargarNotificaciones();
+                    await InvokeAsync(StateHasChanged);
+                }
+            });
+
+            // Notificación de escalamiento
+            hubConnection.On<int, int, string>("NotificarEscalamiento", async (usuarioId, incidenteId, titulo) =>
+            {
+                if (usuarioId == this.usuarioId)
+                {
+                    Console.WriteLine($"[Notificaciones] ✓ Incidente escalado: {titulo}");
+                    await CargarNotificaciones();
+                    await InvokeAsync(StateHasChanged);
+                }
+            });
+
+            // Notificación de resolución
+            hubConnection.On<int, int, string>("NotificarResolucion", async (usuarioId, incidenteId, titulo) =>
+            {
+                if (usuarioId == this.usuarioId)
+                {
+                    Console.WriteLine($"[Notificaciones] ✓ Incidente resuelto: {titulo}");
+                    await CargarNotificaciones();
+                    await InvokeAsync(StateHasChanged);
+                }
+            });
+
+            // Notificación de descarte
+            hubConnection.On<int, int, string, string>("NotificarDescarte", async (usuarioId, incidenteId, titulo, motivo) =>
+            {
+                if (usuarioId == this.usuarioId)
+                {
+                    Console.WriteLine($"[Notificaciones] ✓ Incidente descartado: {titulo}");
+                    await CargarNotificaciones();
+                    await InvokeAsync(StateHasChanged);
+                }
+            });
+
+            await hubConnection.StartAsync();
+            Console.WriteLine("[Notificaciones] ✓ SignalR conectado correctamente");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Notificaciones] ✗ Error al conectar SignalR: {ex.Message}");
+        }
+    }
+
+    private async Task CargarNotificaciones()
+    {
+        notificaciones = await NotificacionService.ObtenerNotificaciones(usuarioId);
+        notificacionesNoLeidas = await NotificacionService.ObtenerNoLeidas(usuarioId);
+    }
+
+    private void ToggleDropdown()
+    {
+        mostrarDropdown = !mostrarDropdown;
+    }
+
+    private async Task MarcarLeida(int notificacionId)
+    {
+        await NotificacionService.MarcarComoLeida(notificacionId);
+        await CargarNotificaciones();
+    }
+
+    private async Task MarcarTodasLeidas()
+    {
+        await NotificacionService.MarcarTodasComoLeidas(usuarioId);
+        await CargarNotificaciones();
+    }
+
+    private string GetNotificacionClass(string tipo)
+    {
+        return tipo switch
+        {
+            "success" => "notification-success",
+            "warning" => "notification-warning",
+            "danger" => "notification-danger",
+            _ => "notification-info"
+        };
+    }
+
+    private string GetNotificacionIcon(string tipo)
+    {
+        return tipo switch
+        {
+            "success" => "fa-check-circle",
+            "warning" => "fa-exclamation-triangle",
+            "danger" => "fa-times-circle",
+            _ => "fa-info-circle"
+        };
+    }
+
+    private string GetTiempoTranscurrido(DateTime fecha)
+    {
+        var diferencia = DateTime.Now - fecha;
+        
+        if (diferencia.TotalMinutes < 1)
+            return "Hace un momento";
+        if (diferencia.TotalMinutes < 60)
+            return $"Hace {(int)diferencia.TotalMinutes} min";
+        if (diferencia.TotalHours < 24)
+            return $"Hace {(int)diferencia.TotalHours} h";
+        if (diferencia.TotalDays < 7)
+            return $"Hace {(int)diferencia.TotalDays} días";
+        
+        return fecha.ToString("dd/MM/yyyy");
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        timer?.Dispose();
+        if (hubConnection != null)
+        {
+            await hubConnection.DisposeAsync();
+        }
+    }
+}
+
+<style>
+    .notification-container {
+        position: relative;
+    }
+
+    .notification-dropdown {
+        position: absolute;
+        top: 100%;
+        right: 0;
+        width: 350px;
+        max-height: 500px;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        z-index: 1050;
+        margin-top: 10px;
+        overflow: hidden;
+    }
+
+    .notification-header {
+        padding: 15px;
+        border-bottom: 1px solid #dee2e6;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: #f8f9fa;
+    }
+
+    .notification-list {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+
+    .notification-item {
+        padding: 12px 15px;
+        border-bottom: 1px solid #f0f0f0;
+        cursor: pointer;
+        display: flex;
+        gap: 12px;
+        transition: background 0.2s;
+    }
+
+    .notification-item:hover {
+        background: #f8f9fa;
+    }
+
+    .notification-item.unread {
+        background: #e7f3ff;
+    }
+
+    .notification-icon {
+        flex-shrink: 0;
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2rem;
+    }
+
+    .notification-info .notification-icon {
+        background: #cfe2ff;
+        color: #0d6efd;
+    }
+
+    .notification-success .notification-icon {
+        background: #d1e7dd;
+        color: #198754;
+    }
+
+    .notification-warning .notification-icon {
+        background: #fff3cd;
+        color: #ffc107;
+    }
+
+    .notification-danger .notification-icon {
+        background: #f8d7da;
+        color: #dc3545;
+    }
+
+    .notification-content {
+        flex: 1;
+    }
+
+    .notification-content p {
+        font-size: 0.9rem;
+        line-height: 1.4;
+    }
+
+    .notification-empty {
+        padding: 40px 20px;
+        text-align: center;
+        color: #6c757d;
+    }
+
+    .notification-empty i {
+        font-size: 3rem;
+        margin-bottom: 10px;
+        opacity: 0.5;
+    }
+</style>

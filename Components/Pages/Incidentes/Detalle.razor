@@ -1,15 +1,16 @@
 @page "/incidentes/detalle/{id:int}"
-@rendermode InteractiveServer
 @using Proyecto.Application.DTOs.Incidentes
 @using Proyecto.Application.DTOs.BaseConocimiento
 @using Proyecto.Application.DTOs.Auth
 @using Proyecto.Application.Interfaces
 @using Proyecto.Domain.Enums
+@using Microsoft.AspNetCore.SignalR.Client
 @inject IIncidenteService IncidenteService
 @inject IBaseConocimientoService BaseConocimientoService
 @inject IAuthService AuthService
 @inject ISessionService SessionService
 @inject NavigationManager Navigation
+@implements IAsyncDisposable
 
 <PageTitle>Detalle Incidente</PageTitle>
 
@@ -80,12 +81,12 @@ else
                     </div>
                 </div>
                 
-                <!-- Panel de Acciones para Técnicos/Admin -->
-                @if (usuarioActual != null && usuarioActual.Nivel >= 1)
+                <!-- Panel de Acciones SOLO para Técnicos (Nivel 1-4) y Administrador (Nivel 5) -->
+                @if (usuarioActual != null && usuarioActual.Nivel >= 1 && usuarioActual.Nivel <= 5)
                 {
                     <div class="card mt-3">
                         <div class="card-header">
-                            <h5>Acciones</h5>
+                            <h5>Acciones de Técnico/Administrador</h5>
                         </div>
                         <div class="card-body">
                             @if (mensaje != null)
@@ -95,20 +96,20 @@ else
                                 </div>
                             }
                             
-                            @if (incidente.Estado != "Cerrado")
+                            @if (incidente.Estado != "Cerrado" && incidente.Estado != "Descartado" && incidente.Estado != "Resuelto")
                             {
-                                <!-- Asignar Técnico -->
-                                @if (incidente.Estado == "Pendiente" || incidente.Estado == "EnProceso")
+                                <!-- SOLO ADMINISTRADOR (Nivel 5) puede asignar técnicos -->
+                                @if (usuarioActual.Nivel == 5 && (incidente.Estado == "Abierto" || incidente.Estado == "Asignado" || incidente.Estado == "EnProceso" || incidente.Estado == "Escalado"))
                                 {
                                     <div class="mb-3">
-                                        <button class="btn btn-primary" @onclick="MostrarFormularioAsignar">
-                                            @(mostrarAsignar ? "Cancelar" : "Asignar a Técnico")
+                                        <button class="btn btn-primary" @onclick="MostrarFormularioAsignar" title="Solo administrador">
+                                            <i class="fas fa-user-plus"></i> @(mostrarAsignar ? "Cancelar" : "Asignar a Técnico")
                                         </button>
                                     </div>
                                     
                                     @if (mostrarAsignar)
                                     {
-                                        <EditForm Model="asignarDto" OnValidSubmit="AsignarIncidente" FormName="asignarForm">
+                                        <EditForm Model="asignarDto" OnValidSubmit="AsignarIncidente">
                                             <div class="mb-3">
                                                 <label class="form-label">Técnico:</label>
                                                 <InputSelect class="form-select" @bind-Value="asignarDto.UsuarioAsignadoId">
@@ -124,56 +125,109 @@ else
                                     }
                                 }
                                 
-                                <!-- Escalar -->
-                                @if (usuarioActual.Nivel < 4 && (incidente.Estado == "EnProceso" || incidente.Estado == "Escalado"))
+                                <!-- TÉCNICOS (Nivel 1-3) pueden escalar -->
+                                @if (usuarioActual.Nivel >= 1 && usuarioActual.Nivel <= 3 && 
+                                     (incidente.Estado == "Asignado" || incidente.Estado == "EnProceso" || incidente.Estado == "Escalado"))
                                 {
                                     <div class="mb-3">
-                                        <button class="btn btn-warning" @onclick="MostrarFormularioEscalar">
-                                            @(mostrarEscalar ? "Cancelar" : "Escalar")
+                                        <button class="btn btn-warning" @onclick="MostrarFormularioEscalar" title="Escalar a nivel superior">
+                                            <i class="fas fa-arrow-up"></i> @(mostrarEscalar ? "Cancelar" : "Escalar a Nivel Superior")
                                         </button>
                                     </div>
                                     
                                     @if (mostrarEscalar)
                                     {
-                                        <EditForm Model="escalarDto" OnValidSubmit="EscalarIncidente" FormName="escalarForm">
+                                        <EditForm Model="escalarDto" OnValidSubmit="EscalarIncidente">
                                             <div class="mb-3">
                                                 <label class="form-label">Nivel de Escalamiento:</label>
                                                 <InputSelect class="form-select" @bind-Value="escalarDto.NuevoNivel">
-                                                    @for (int i = (int)usuarioActual.Nivel + 1; i <= 4; i++)
+                                                    @for (int i = usuarioActual.Nivel + 1; i <= 4; i++)
                                                     {
                                                         <option value="@i">Nivel @i</option>
                                                     }
                                                 </InputSelect>
                                             </div>
                                             <div class="mb-3">
-                                                <label class="form-label">Mensaje:</label>
-                                                <InputTextArea class="form-control" rows="3" @bind-Value="escalarDto.MensajeEscalacion" />
+                                                <label class="form-label">Razón del escalamiento:</label>
+                                                <InputTextArea class="form-control" rows="3" @bind-Value="escalarDto.MensajeEscalacion" required />
                                             </div>
                                             <button type="submit" class="btn btn-warning">Escalar</button>
                                         </EditForm>
                                     }
                                 }
                                 
-                                <!-- Resolver -->
-                                @if (incidente.Estado != "Resuelto")
+                                <!-- TÉCNICOS (Nivel 1-4) y ADMINISTRADOR (Nivel 5) pueden resolver -->
+                                @if (usuarioActual.Nivel >= 1 && incidente.Estado != "Resuelto")
                                 {
                                     <div class="mb-3">
-                                        <button class="btn btn-success" @onclick="MostrarFormularioResolver">
-                                            @(mostrarResolver ? "Cancelar" : "Resolver")
+                                        <button class="btn btn-success" @onclick="MostrarFormularioResolver" title="Marcar como resuelto">
+                                            <i class="fas fa-check-circle"></i> @(mostrarResolver ? "Cancelar" : "Resolver Incidente")
                                         </button>
                                     </div>
                                     
                                     @if (mostrarResolver)
                                     {
-                                        <EditForm Model="resolverDto" OnValidSubmit="ResolverIncidente" FormName="resolverForm">
+                                        <EditForm Model="resolverDto" OnValidSubmit="ResolverIncidente">
                                             <div class="mb-3">
-                                                <label class="form-label">Resolución:</label>
+                                                <label class="form-label">Descripción de la resolución:</label>
                                                 <InputTextArea class="form-control" rows="4" @bind-Value="resolverDto.Resolucion" required />
                                             </div>
                                             <button type="submit" class="btn btn-success">Marcar como Resuelto</button>
                                         </EditForm>
                                     }
                                 }
+                                
+                                <!-- SOLO ADMINISTRADOR (Nivel 5) puede descartar -->
+                                @if (usuarioActual.Nivel == 5 && incidente.Estado != "Descartado" && incidente.Estado != "Resuelto")
+                                {
+                                    <div class="mb-3">
+                                        <button class="btn btn-danger" @onclick="MostrarFormularioDescartar" title="Solo administrador">
+                                            <i class="fas fa-ban"></i> @(mostrarDescartar ? "Cancelar" : "Descartar Incidente")
+                                        </button>
+                                    </div>
+                                    
+                                    @if (mostrarDescartar)
+                                    {
+                                        <EditForm Model="descartarDto" OnValidSubmit="DescartarIncidente">
+                                            <div class="mb-3">
+                                                <label class="form-label">Motivo del descarte:</label>
+                                                <InputTextArea class="form-control" rows="3" @bind-Value="descartarDto.MotivoDescarte" required />
+                                            </div>
+                                            <button type="submit" class="btn btn-danger">Descartar Incidente</button>
+                                        </EditForm>
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle"></i> Este incidente está cerrado y no se pueden realizar más acciones.
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+                
+                <!-- Panel informativo para ESTUDIANTES (Nivel 0) -->
+                @if (usuarioActual != null && usuarioActual.Nivel == 0)
+                {
+                    <div class="card mt-3">
+                        <div class="card-header bg-info text-white">
+                            <h5><i class="fas fa-info-circle"></i> Estado de tu Incidente</h5>
+                        </div>
+                        <div class="card-body">
+                            <p>Tu incidente está siendo atendido por el equipo de soporte técnico.</p>
+                            <p><strong>Estado actual:</strong> <span class="badge bg-primary">@incidente.Estado</span></p>
+                            @if (!string.IsNullOrEmpty(incidente.UsuarioAsignadoNombre))
+                            {
+                                <p><strong>Asignado a:</strong> @incidente.UsuarioAsignadoNombre</p>
+                            }
+                            @if (incidente.Resolucion != null)
+                            {
+                                <div class="alert alert-success mt-3">
+                                    <h6><i class="fas fa-check-circle"></i> Resolución:</h6>
+                                    <p class="mb-0">@incidente.Resolucion</p>
+                                </div>
                             }
                         </div>
                     </div>
@@ -218,26 +272,28 @@ else
     private List<BaseConocimientoDto>? articulosRelacionados;
     private UsuarioResponseDto? usuarioActual;
     private List<UsuarioResponseDto> tecnicos = new();
+    private HubConnection? hubConnection;
     
     private bool mostrarAsignar = false;
     private bool mostrarEscalar = false;
     private bool mostrarResolver = false;
+    private bool mostrarDescartar = false;
     
-    [SupplyParameterFromForm]
-    private AsignarIncidenteDto asignarDto { get; set; } = new();
+    private AsignarIncidenteDto asignarDto = new();
     
-    [SupplyParameterFromForm]
-    private EscalarIncidenteDto escalarDto { get; set; } = new();
+    private EscalarIncidenteDto escalarDto = new();
     
-    [SupplyParameterFromForm]
-    private ResolverIncidenteDto resolverDto { get; set; } = new();
+    private ResolverIncidenteDto resolverDto = new();
+    
+    private DescartarIncidenteDto descartarDto = new();
     
     private string? mensaje;
     private bool mensajeExito;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender)
+        // SIEMPRE cargar usuario si no está disponible
+        if (usuarioActual == null)
         {
             usuarioActual = await SessionService.GetUsuarioActualAsync();
             
@@ -247,6 +303,12 @@ else
                 return;
             }
             
+            Console.WriteLine($"[Detalle] Usuario cargado: {usuarioActual.Email}, Nivel: {usuarioActual.Nivel}");
+        }
+        
+        // Cargar incidente y datos solo en el primer render
+        if (firstRender)
+        {
             incidente = await IncidenteService.ObtenerPorIdAsync(Id);
             
             if (incidente == null)
@@ -272,12 +334,24 @@ else
                 tecnicos = await AuthService.ObtenerUsuariosPorNivelMinimoAsync(1);
             }
             
-            // Inicializar DTOs con el ID del incidente
-            asignarDto.IncidenteId = Id;
-            escalarDto.IncidenteId = Id;
-            resolverDto.IncidenteId = Id;
-            
+            await InicializarSignalR();
             StateHasChanged();
+        }
+        
+        // SIEMPRE asegurar que los DTOs tengan el UsuarioActualId correcto
+        // (esto se ejecuta cada vez que se renderiza, garantizando que nunca sea 0)
+        if (usuarioActual != null)
+        {
+            asignarDto.IncidenteId = Id;
+            asignarDto.UsuarioActualId = usuarioActual.Id;
+            escalarDto.IncidenteId = Id;
+            escalarDto.UsuarioActualId = usuarioActual.Id;
+            resolverDto.IncidenteId = Id;
+            resolverDto.UsuarioActualId = usuarioActual.Id;
+            descartarDto.IncidenteId = Id;
+            descartarDto.UsuarioActualId = usuarioActual.Id;
+            
+            Console.WriteLine($"[Detalle] DTOs actualizados - UsuarioActualId: {usuarioActual.Id}, Render: {(firstRender ? "first" : "subsequent")}");
         }
     }
     
@@ -303,6 +377,16 @@ else
         mostrarResolver = !mostrarResolver;
         mostrarAsignar = false;
         mostrarEscalar = false;
+        mostrarDescartar = false;
+        mensaje = null;
+    }
+    
+    private void MostrarFormularioDescartar()
+    {
+        mostrarDescartar = !mostrarDescartar;
+        mostrarAsignar = false;
+        mostrarEscalar = false;
+        mostrarResolver = false;
         mensaje = null;
     }
     
@@ -310,12 +394,29 @@ else
     {
         try
         {
+            // CRÍTICO: Recargar usuario de sesión antes de cualquier operación
+            usuarioActual = await SessionService.GetUsuarioActualAsync();
+            
+            // Validar permiso
+            if (usuarioActual == null || usuarioActual.Nivel != 5)
+            {
+                mensaje = "No tienes permisos para asignar incidentes";
+                mensajeExito = false;
+                return;
+            }
+            
             if (asignarDto.UsuarioAsignadoId <= 0)
             {
                 mensaje = "Debe seleccionar un técnico";
                 mensajeExito = false;
                 return;
             }
+            
+            // Asegurar que UsuarioActualId esté establecido
+            asignarDto.UsuarioActualId = usuarioActual.Id;
+            asignarDto.IncidenteId = Id;
+            
+            Console.WriteLine($"[Detalle] Asignando incidente - UsuarioActualId: {asignarDto.UsuarioActualId}, UsuarioAsignadoId: {asignarDto.UsuarioAsignadoId}");
             
             await IncidenteService.AsignarAsync(asignarDto);
             mensaje = "Incidente asignado correctamente";
@@ -324,6 +425,7 @@ else
             
             // Recargar incidente
             incidente = await IncidenteService.ObtenerPorIdAsync(Id);
+            StateHasChanged();
         }
         catch (Exception ex)
         {
@@ -336,12 +438,27 @@ else
     {
         try
         {
+            // CRÍTICO: Recargar usuario de sesión antes de cualquier operación
+            usuarioActual = await SessionService.GetUsuarioActualAsync();
+            
+            // Validar permiso
+            if (usuarioActual == null || usuarioActual.Nivel < 1 || usuarioActual.Nivel > 3)
+            {
+                mensaje = "Solo técnicos de nivel 1-3 pueden escalar incidentes";
+                mensajeExito = false;
+                return;
+            }
+            
             if (string.IsNullOrWhiteSpace(escalarDto.MensajeEscalacion))
             {
                 mensaje = "Debe proporcionar un mensaje de escalamiento";
                 mensajeExito = false;
                 return;
             }
+            
+            // Asegurar que UsuarioActualId esté establecido
+            escalarDto.UsuarioActualId = usuarioActual.Id;
+            escalarDto.IncidenteId = Id;
             
             await IncidenteService.EscalarAsync(escalarDto);
             mensaje = $"Incidente escalado a Nivel {escalarDto.NuevoNivel}";
@@ -350,6 +467,7 @@ else
             
             // Recargar incidente
             incidente = await IncidenteService.ObtenerPorIdAsync(Id);
+            StateHasChanged();
         }
         catch (Exception ex)
         {
@@ -362,12 +480,27 @@ else
     {
         try
         {
+            // CRÍTICO: Recargar usuario de sesión antes de cualquier operación
+            usuarioActual = await SessionService.GetUsuarioActualAsync();
+            
+            // Validar permiso
+            if (usuarioActual == null || usuarioActual.Nivel < 1)
+            {
+                mensaje = "No tienes permisos para resolver incidentes";
+                mensajeExito = false;
+                return;
+            }
+            
             if (string.IsNullOrWhiteSpace(resolverDto.Resolucion))
             {
                 mensaje = "Debe proporcionar una resolución";
                 mensajeExito = false;
                 return;
             }
+            
+            // Asegurar que UsuarioActualId esté establecido
+            resolverDto.UsuarioActualId = usuarioActual.Id;
+            resolverDto.IncidenteId = Id;
             
             await IncidenteService.ResolverAsync(resolverDto);
             mensaje = "Incidente marcado como resuelto";
@@ -376,11 +509,134 @@ else
             
             // Recargar incidente
             incidente = await IncidenteService.ObtenerPorIdAsync(Id);
+            StateHasChanged();
         }
         catch (Exception ex)
         {
             mensaje = $"Error al resolver: {ex.Message}";
             mensajeExito = false;
+        }
+    }
+    
+    private async Task DescartarIncidente()
+    {
+        try
+        {
+            // CRÍTICO: Recargar usuario de sesión antes de cualquier operación
+            usuarioActual = await SessionService.GetUsuarioActualAsync();
+            
+            // Validar permiso
+            if (usuarioActual == null || usuarioActual.Nivel != 5)
+            {
+                mensaje = "Solo el administrador puede descartar incidentes";
+                mensajeExito = false;
+                return;
+            }
+            
+            if (string.IsNullOrWhiteSpace(descartarDto.MotivoDescarte))
+            {
+                mensaje = "Debe proporcionar un motivo para el descarte";
+                mensajeExito = false;
+                return;
+            }
+            
+            // Asegurar que UsuarioActualId esté establecido
+            descartarDto.UsuarioActualId = usuarioActual.Id;
+            descartarDto.IncidenteId = Id;
+            
+            Console.WriteLine($"[Detalle] Descartando incidente - UsuarioActualId: {descartarDto.UsuarioActualId}, IncidenteId: {descartarDto.IncidenteId}");
+            
+            await IncidenteService.DescartarAsync(descartarDto);
+            mensaje = "Incidente descartado correctamente";
+            mensajeExito = true;
+            mostrarDescartar = false;
+            
+            // Recargar incidente
+            incidente = await IncidenteService.ObtenerPorIdAsync(Id);
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            mensaje = $"Error al descartar: {ex.Message}";
+            mensajeExito = false;
+        }
+    }
+
+    private async Task InicializarSignalR()
+    {
+        try
+        {
+            hubConnection = new HubConnectionBuilder()
+                .WithUrl(Navigation.ToAbsoluteUri("/notificacionhub"))
+                .WithAutomaticReconnect()
+                .Build();
+
+            // Escuchar cuando este incidente específico se actualiza
+            hubConnection.On<int, string>("ActualizarIncidentes", async (incidenteId, accion) =>
+            {
+                if (incidenteId == Id)
+                {
+                    Console.WriteLine($"[Detalle] ✓ SignalR - Incidente {incidenteId} {accion}, recargando...");
+                    incidente = await IncidenteService.ObtenerPorIdAsync(Id);
+                    await InvokeAsync(StateHasChanged);
+                }
+            });
+
+            // Escuchar eventos específicos
+            hubConnection.On<int, int, string>("NotificarAsignacion", async (usuarioId, incidenteId, titulo) =>
+            {
+                if (incidenteId == Id)
+                {
+                    Console.WriteLine($"[Detalle] SignalR - Incidente asignado, recargando...");
+                    incidente = await IncidenteService.ObtenerPorIdAsync(Id);
+                    await InvokeAsync(StateHasChanged);
+                }
+            });
+
+            hubConnection.On<int, int, string>("NotificarEscalamiento", async (usuarioId, incidenteId, titulo) =>
+            {
+                if (incidenteId == Id)
+                {
+                    Console.WriteLine($"[Detalle] SignalR - Incidente escalado, recargando...");
+                    incidente = await IncidenteService.ObtenerPorIdAsync(Id);
+                    await InvokeAsync(StateHasChanged);
+                }
+            });
+
+            hubConnection.On<int, int, string>("NotificarResolucion", async (usuarioId, incidenteId, titulo) =>
+            {
+                if (incidenteId == Id)
+                {
+                    Console.WriteLine($"[Detalle] SignalR - Incidente resuelto, recargando...");
+                    incidente = await IncidenteService.ObtenerPorIdAsync(Id);
+                    await InvokeAsync(StateHasChanged);
+                }
+            });
+
+            hubConnection.On<int, int, string, string>("NotificarDescarte", async (usuarioId, incidenteId, titulo, motivo) =>
+            {
+                if (incidenteId == Id)
+                {
+                    Console.WriteLine($"[Detalle] SignalR - Incidente descartado, recargando...");
+                    incidente = await IncidenteService.ObtenerPorIdAsync(Id);
+                    await InvokeAsync(StateHasChanged);
+                }
+            });
+
+            await hubConnection.StartAsync();
+            Console.WriteLine($"[Detalle] ✓ SignalR conectado para incidente {Id}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Detalle] ✗ Error conectando SignalR: {ex.Message}");
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection is not null)
+        {
+            await hubConnection.DisposeAsync();
         }
     }
 }

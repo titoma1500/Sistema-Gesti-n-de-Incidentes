@@ -5,6 +5,8 @@ using Proyecto.Domain.Entities;
 using Proyecto.Domain.Enums;
 using Proyecto.Infrastructure.Data;
 using Proyecto.Infrastructure.Repositories;
+using Microsoft.AspNetCore.SignalR;
+using Proyecto.Infrastructure.Hubs;
 
 namespace Proyecto.Application.Services;
 
@@ -14,17 +16,23 @@ public class IncidenteService : IIncidenteService
     private readonly IUsuarioRepository _usuarioRepository;
     private readonly IEmailService _emailService;
     private readonly ApplicationDbContext _context;
+    private readonly IHubContext<NotificacionHub> _hubContext;
+    private readonly INotificacionService _notificacionService;
 
     public IncidenteService(
         IIncidenteRepository incidenteRepository,
         IUsuarioRepository usuarioRepository,
         IEmailService emailService,
-        ApplicationDbContext context)
+        ApplicationDbContext context,
+        IHubContext<NotificacionHub> hubContext,
+        INotificacionService notificacionService)
     {
         _incidenteRepository = incidenteRepository;
         _usuarioRepository = usuarioRepository;
         _emailService = emailService;
         _context = context;
+        _hubContext = hubContext;
+        _notificacionService = notificacionService;
     }
 
     public async Task<IEnumerable<IncidenteDto>> ObtenerTodosAsync()
@@ -90,6 +98,13 @@ public class IncidenteService : IIncidenteService
             foreach (var admin in admins)
             {
                 await _emailService.EnviarNotificacionAsignacionAsync(admin.Email, incidente.Titulo);
+                
+                // Notificación en sistema para cada administrador
+                await _notificacionService.AgregarNotificacion(
+                    admin.Id, 
+                    $"Nuevo incidente creado: {incidente.Titulo}", 
+                    "info"
+                );
             }
         }
         catch (Exception)
@@ -97,11 +112,31 @@ public class IncidenteService : IIncidenteService
             // Ignorar errores de email - no bloquear la creación del incidente
         }
 
+        // Notificación SignalR para actualizar la lista de incidentes
+        Console.WriteLine($"[IncidenteService] ✓✓✓ Enviando SignalR 'ActualizarIncidentes' - Incidente {incidenteCreado.Id} creado");
+        await _hubContext.Clients.All.SendAsync("ActualizarIncidentes", incidenteCreado.Id, "creado");
+
         return MapearADto(incidenteCompleto!);
     }
 
     public async Task AsignarAsync(AsignarIncidenteDto dto)
     {
+        Console.WriteLine($"[IncidenteService] AsignarAsync - UsuarioActualId: {dto.UsuarioActualId}");
+        
+        // Validar que el usuario actual es administrador
+        var usuarioActual = await _usuarioRepository.ObtenerPorIdAsync(dto.UsuarioActualId);
+        
+        Console.WriteLine($"[IncidenteService] Usuario encontrado: {usuarioActual?.Nombre}, Nivel: {usuarioActual?.Nivel}");
+        
+        if (usuarioActual == null || usuarioActual.Nivel != NivelUsuario.Nivel5)
+        {
+            var error = usuarioActual == null 
+                ? $"Usuario con ID {dto.UsuarioActualId} no encontrado" 
+                : $"Usuario {usuarioActual.Nombre} tiene nivel {usuarioActual.Nivel}, requiere Nivel5";
+            Console.WriteLine($"[IncidenteService] ERROR: {error}");
+            throw new UnauthorizedAccessException($"Solo los administradores pueden asignar incidentes. {error}");
+        }
+        
         var incidente = await _incidenteRepository.ObtenerPorIdAsync(dto.IncidenteId);
         if (incidente == null)
             throw new Exception("Incidente no encontrado");
@@ -125,10 +160,23 @@ public class IncidenteService : IIncidenteService
         {
             // Ignorar errores de email
         }
+
+        // Crear notificación para el técnico asignado
+        await _notificacionService.AgregarNotificacion(dto.UsuarioAsignadoId, $"Se te ha asignado el incidente: {incidente.Titulo}", "info");
+        
+        // Notificación SignalR
+        Console.WriteLine($"[IncidenteService] ✓✓✓ Enviando SignalR 'ActualizarIncidentes' - Incidente {dto.IncidenteId} asignado");
+        await _hubContext.Clients.All.SendAsync("NotificarAsignacion", dto.UsuarioAsignadoId, dto.IncidenteId, incidente.Titulo);
+        await _hubContext.Clients.All.SendAsync("ActualizarIncidentes", dto.IncidenteId, "asignado");
     }
 
     public async Task EscalarAsync(EscalarIncidenteDto dto)
     {
+        // Validar que el usuario actual es técnico nivel 1-3
+        var usuarioActual = await _usuarioRepository.ObtenerPorIdAsync(dto.UsuarioActualId);
+        if (usuarioActual == null || usuarioActual.Nivel < NivelUsuario.Nivel1 || usuarioActual.Nivel > NivelUsuario.Nivel3)
+            throw new UnauthorizedAccessException("Solo los técnicos de nivel 1-3 pueden escalar incidentes");
+        
         var incidente = await _incidenteRepository.ObtenerPorIdAsync(dto.IncidenteId);
         if (incidente == null)
             throw new Exception("Incidente no encontrado");
@@ -157,10 +205,23 @@ public class IncidenteService : IIncidenteService
         {
             // Ignorar errores de email
         }
+
+        // Notificación al técnico de nivel superior
+        await _notificacionService.AgregarNotificacion(dto.UsuarioAsignadoId, $"Se te ha asignado el incidente escalado: {incidente.Titulo}", "warning");
+        
+        // Notificación SignalR
+        Console.WriteLine($"[IncidenteService] ✓✓✓ Enviando SignalR 'ActualizarIncidentes' - Incidente {dto.IncidenteId} escalado");
+        await _hubContext.Clients.All.SendAsync("NotificarEscalamiento", dto.UsuarioAsignadoId, dto.IncidenteId, incidente.Titulo);
+        await _hubContext.Clients.All.SendAsync("ActualizarIncidentes", dto.IncidenteId, "escalado");
     }
 
     public async Task ResolverAsync(ResolverIncidenteDto dto)
     {
+        // Validar que el usuario actual es técnico o administrador
+        var usuarioActual = await _usuarioRepository.ObtenerPorIdAsync(dto.UsuarioActualId);
+        if (usuarioActual == null || usuarioActual.Nivel < NivelUsuario.Nivel1)
+            throw new UnauthorizedAccessException("Solo los técnicos y administradores pueden resolver incidentes");
+        
         var incidente = await _incidenteRepository.ObtenerPorIdAsync(dto.IncidenteId);
         if (incidente == null)
             throw new Exception("Incidente no encontrado");
@@ -187,6 +248,14 @@ public class IncidenteService : IIncidenteService
         {
             // Ignorar errores de email
         }
+
+        // Notificación al usuario que reportó el incidente
+        await _notificacionService.AgregarNotificacion(incidente.UsuarioReportaId, $"Tu incidente '{incidente.Titulo}' ha sido resuelto", "success");
+        
+        // Notificación SignalR
+        Console.WriteLine($"[IncidenteService] ✓✓✓ Enviando SignalR 'ActualizarIncidentes' - Incidente {dto.IncidenteId} resuelto");
+        await _hubContext.Clients.All.SendAsync("NotificarResolucion", incidente.UsuarioReportaId, dto.IncidenteId, incidente.Titulo);
+        await _hubContext.Clients.All.SendAsync("ActualizarIncidentes", dto.IncidenteId, "resuelto");
     }
 
     public async Task CerrarAsync(int incidenteId)
@@ -204,6 +273,11 @@ public class IncidenteService : IIncidenteService
 
     public async Task DescartarAsync(DescartarIncidenteDto dto)
     {
+        // Validar que el usuario actual es administrador
+        var usuarioActual = await _usuarioRepository.ObtenerPorIdAsync(dto.UsuarioActualId);
+        if (usuarioActual == null || usuarioActual.Nivel != NivelUsuario.Nivel5)
+            throw new UnauthorizedAccessException("Solo los administradores pueden descartar incidentes");
+        
         var incidente = await _incidenteRepository.ObtenerPorIdAsync(dto.IncidenteId);
         if (incidente == null)
             throw new Exception("Incidente no encontrado");
@@ -228,6 +302,14 @@ public class IncidenteService : IIncidenteService
         {
             // Ignorar errores de email
         }
+
+        // Notificación al usuario que reportó el incidente
+        await _notificacionService.AgregarNotificacion(incidente.UsuarioReportaId, $"Tu incidente '{incidente.Titulo}' ha sido descartado. Motivo: {dto.MotivoDescarte}", "danger");
+        
+        // Notificación SignalR
+        Console.WriteLine($"[IncidenteService] ✓✓✓ Enviando SignalR 'ActualizarIncidentes' - Incidente {dto.IncidenteId} descartado");
+        await _hubContext.Clients.All.SendAsync("NotificarDescarte", incidente.UsuarioReportaId, dto.IncidenteId, incidente.Titulo, dto.MotivoDescarte);
+        await _hubContext.Clients.All.SendAsync("ActualizarIncidentes", dto.IncidenteId, "descartado");
     }
 
     public async Task<bool> ValidarLimiteIncidentesAsync(int usuarioId)

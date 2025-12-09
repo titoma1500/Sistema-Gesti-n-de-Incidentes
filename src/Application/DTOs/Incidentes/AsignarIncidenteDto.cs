@@ -9,4 +9,7 @@ public class AsignarIncidenteDto
 
     [Required]
     public int UsuarioAsignadoId { get; set; }
+    
+    [Required]
+    public int UsuarioActualId { get; set; }
 }

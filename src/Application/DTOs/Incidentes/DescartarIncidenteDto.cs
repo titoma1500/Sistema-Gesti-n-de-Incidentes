@@ -9,4 +9,7 @@ public class DescartarIncidenteDto
 
     [Required(ErrorMessage = "Debe proporcionar el motivo del descarte")]
     public string MotivoDescarte { get; set; } = string.Empty;
+    
+    [Required]
+    public int UsuarioActualId { get; set; }
 }

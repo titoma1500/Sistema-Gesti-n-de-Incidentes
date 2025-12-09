@@ -9,4 +9,7 @@ public class ResolverIncidenteDto
 
     [Required(ErrorMessage = "La resolución es requerida")]
     public string Resolucion { get; set; } = string.Empty;
+    
+    [Required]
+    public int UsuarioActualId { get; set; }
 }

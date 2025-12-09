@@ -1,8 +1,8 @@
-@rendermode InteractiveServer
 @using Proyecto.Application.Interfaces
 @using Proyecto.Application.DTOs.Auth
 @inject ISessionService SessionService
 @inject NavigationManager Navigation
+@implements IDisposable
 
 <div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
@@ -101,25 +101,51 @@
 
 @code {
     private UsuarioResponseDto? usuario;
+    private System.Threading.Timer? timer;
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    protected override void OnInitialized()
     {
-        if (firstRender)
-        {
-            usuario = await SessionService.GetUsuarioActualAsync();
-            StateHasChanged();
-        }
+        // Timer para verificar sesión cada 500ms
+        timer = new System.Threading.Timer(async _ => await VerificarSesion(), null, TimeSpan.Zero, TimeSpan.FromMilliseconds(500));
     }
 
-    protected override async Task OnParametersSetAsync()
+    private async Task VerificarSesion()
     {
-        usuario = await SessionService.GetUsuarioActualAsync();
+        try
+        {
+            var usuarioActual = await SessionService.GetUsuarioActualAsync();
+            
+            // Solo actualizar si cambió
+            if ((usuario == null && usuarioActual != null) || (usuario != null && usuarioActual == null))
+            {
+                usuario = usuarioActual;
+                if (usuario != null)
+                {
+                    Console.WriteLine($"[NavMenu] ✓ Usuario detectado: {usuario.Nombre}, Nivel: {usuario.Nivel}");
+                    timer?.Dispose(); // Detener timer una vez que tenemos usuario
+                }
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[NavMenu] Error verificando sesión: {ex.Message}");
+        }
     }
 
     private async Task CerrarSesion()
     {
         await SessionService.ClearUsuarioActualAsync();
         usuario = null;
-        Navigation.NavigateTo("/login");
+        
+        // Reiniciar timer para detectar nuevo login
+        timer = new System.Threading.Timer(async _ => await VerificarSesion(), null, TimeSpan.Zero, TimeSpan.FromMilliseconds(500));
+        
+        Navigation.NavigateTo("/login", forceLoad: false);
+    }
+
+    public void Dispose()
+    {
+        timer?.Dispose();
     }
 }

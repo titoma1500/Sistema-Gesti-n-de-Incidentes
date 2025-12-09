@@ -15,7 +15,18 @@
 </head>
 
 <body>
-    <Routes />
+    <ErrorBoundary>
+        <ChildContent>
+            <Routes @rendermode="@RenderMode.InteractiveServer" />
+        </ChildContent>
+        <ErrorContent Context="error">
+            <div style="background: red; color: white; padding: 20px;">
+                <h1>ERROR CAPTURADO:</h1>
+                <p>@error.Message</p>
+                <pre>@error.StackTrace</pre>
+            </div>
+        </ErrorContent>
+    </ErrorBoundary>
     <script src="_framework/blazor.web.js"></script>
 </body>
 

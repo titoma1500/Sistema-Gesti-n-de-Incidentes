@@ -1,5 +1,4 @@
 @page "/conocimiento"
-@rendermode InteractiveServer
 @using Proyecto.Application.DTOs.BaseConocimiento
 @using Proyecto.Application.Interfaces
 @inject IBaseConocimientoService BaseConocimientoService
@@ -70,12 +69,16 @@ else
                             </small>
                         </div>
                         <div class="card-footer d-flex justify-content-between">
-                            <button class="btn btn-sm btn-primary" @onclick="() => VerSolucion(articulo)">
+                            <button class="btn btn-sm btn-primary" 
+                                    title="Ver solución completa"
+                                    @onclick="() => VerSolucion(articulo)">
                                 <i class="fas fa-book-open me-1"></i>Ver Solución
                             </button>
                             @if (nivelUsuario == 5)
                             {
-                                <button class="btn btn-sm btn-danger" @onclick="() => MostrarConfirmacionEliminar(articulo)">
+                                <button class="btn btn-sm btn-danger" 
+                                        title="Eliminar artículo"
+                                        @onclick="() => MostrarConfirmacionEliminar(articulo)">
                                     <i class="fas fa-trash me-1"></i>Eliminar
                                 </button>
                             }

@@ -15,4 +15,7 @@ public class EscalarIncidenteDto
 
     [Required(ErrorMessage = "El mensaje de escalación es requerido")]
     public string MensajeEscalacion { get; set; } = string.Empty;
+    
+    [Required]
+    public int UsuarioActualId { get; set; }
 }
