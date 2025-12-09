@@ -215,8 +215,8 @@ El sistema incluye usuarios precargados para pruebas:
 | Ana López | ana@universidad.edu | tecnico123 | Técnico Nivel 2 | 2 |
 | Luis Martín | luis@universidad.edu | tecnico123 | Técnico Nivel 3 | 3 |
 | Pedro Sánchez | pedro@universidad.edu | tecnico123 | Técnico Nivel 4 | 4 |
-| Juan Estudiante | juan@universidad.edu | tecnico123 | Estudiante | 0 |
-| María García | maria@universidad.edu | tecnico123 | Estudiante | 0 |
+| Juan Estudiante | juan@universidad.edu | estudiante123 | Estudiante | 0 |
+| María García | maria@universidad.edu | estudiante123 | Estudiante | 0 |
 
 ## 📖 Guía de Uso Rápida
 

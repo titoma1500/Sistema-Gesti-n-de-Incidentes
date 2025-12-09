@@ -71,6 +71,6 @@ echo.
 echo Usuarios de prueba:
 echo   Admin: admin@universidad.edu / admin123
 echo   Técnico: carlos@universidad.edu / tecnico123
-echo   Estudiante: juan@universidad.edu / tecnico123
+echo   Estudiante: juan@universidad.edu / estudiante123
 echo ========================================
 pause

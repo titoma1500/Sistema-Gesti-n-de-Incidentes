@@ -100,7 +100,7 @@ Luego abre: http://localhost:5078
 |-----|-------|-----------|
 | Administrador | admin@universidad.edu | admin123 |
 | Técnico N1 | carlos@universidad.edu | tecnico123 |
-| Estudiante | juan@universidad.edu | tecnico123 |
+| Estudiante | juan@universidad.edu | estudiante123 |
 
 ---
 
